@@ -27,7 +27,7 @@ export function Model() {
         metalness: 0.4,
         roughness: 0.9,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.65,
         envMapIntensity: 1,
       });
     }
