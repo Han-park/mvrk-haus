@@ -11,7 +11,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 pb-24 bg-black">
+      <footer className="pb-30 bg-black">
         <div className="container mx-auto px-4 text-center font-roboto-mono text-sm">
           <p className="text-gray-400">Website coming soon.</p>
           <p className="text-gray-600">by MVRK CRAFT from MVRK HAUS.</p>
