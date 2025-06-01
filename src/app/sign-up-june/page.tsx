@@ -75,6 +75,13 @@ export default function SignUpJune() {
       console.log('🔐 Session user ID:', session?.user?.id)
       console.log('🔐 Session access token exists:', !!session?.access_token)
       
+      // 🔧 DEBUG: Check network environment
+      console.log('🌐 Network debug:', {
+        origin: typeof window !== 'undefined' ? window.location.origin : 'SSR',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      })
+      
       // Add a timeout to the query to prevent hanging
       const queryPromise = supabase
         .from('user_profiles')
@@ -87,22 +94,30 @@ export default function SignUpJune() {
       )
 
       console.log('⏱️ Executing query with timeout...')
+      
+      // 🔧 IMPROVED: Add more detailed logging
+      const startTime = Date.now()
       const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-
-      console.log('📊 Query completed. Error:', error ? error.message : 'None')
-      console.log('📊 Query completed. Error code:', error ? error.code : 'None')
-      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
+      const endTime = Date.now()
+      
+      console.log(`📊 Query completed in ${endTime - startTime}ms`)
+      console.log('📊 Query error:', error ? error.message : 'None')
+      console.log('📊 Query error code:', error ? error.code : 'None')
+      console.log('📊 Query data:', data ? 'Found' : 'Not found')
 
       if (error) {
         // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
           console.log('❌ No profile found, creating new profile...')
-          // Call createUserProfile directly to avoid dependency issues
           await createUserProfile(userId)
           return
         }
         console.error('❌ Error fetching user profile:', error)
         console.error('❌ Full error object:', JSON.stringify(error, null, 2))
+        
+        // 🔧 IMPORTANT: Set loading to false even on error
+        console.log('🔧 Setting loading to false due to error')
+        setLoading(false)
         return
       }
 
@@ -116,6 +131,10 @@ export default function SignUpJune() {
       if (errorMessage === 'Query timeout') {
         console.log('⏰ Query timed out, attempting to create new profile...')
         await createUserProfile(userId)
+      } else {
+        // 🔧 IMPORTANT: Set loading to false on any exception
+        console.log('🔧 Setting loading to false due to exception')
+        setLoading(false)
       }
     }
   }, [createUserProfile])
@@ -124,17 +143,21 @@ export default function SignUpJune() {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
       console.log('🔄 Starting getSessionAndProfile...')
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('📊 Session result:', session ? 'Session found' : 'No session')
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('👤 User found, fetching profile for:', session.user.id)
-        await fetchUserProfile(session.user.id)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('📊 Session result:', session ? 'Session found' : 'No session')
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          console.log('👤 User found, fetching profile for:', session.user.id)
+          await fetchUserProfile(session.user.id)
+        }
+      } catch (error) {
+        console.error('💥 Error in getSessionAndProfile:', error)
+      } finally {
+        console.log('✅ Setting loading to false')
+        setLoading(false)
       }
-      
-      console.log('✅ Setting loading to false')
-      setLoading(false)
     }
 
     getSessionAndProfile()
@@ -145,15 +168,19 @@ export default function SignUpJune() {
         console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
         setUser(session?.user ?? null)
         
-        if (session?.user) {
-          console.log('👤 Auth change - fetching profile for:', session.user.id)
-          await fetchUserProfile(session.user.id)
-        } else {
-          setProfile(null)
+        try {
+          if (session?.user) {
+            console.log('👤 Auth change - fetching profile for:', session.user.id)
+            await fetchUserProfile(session.user.id)
+          } else {
+            setProfile(null)
+          }
+        } catch (error) {
+          console.error('💥 Error in auth state change:', error)
+        } finally {
+          console.log('✅ Auth change - setting loading to false')
+          setLoading(false)
         }
-        
-        console.log('✅ Auth change - setting loading to false')
-        setLoading(false)
       }
     )
 
