@@ -41,10 +41,64 @@ export default function SignUpJune() {
       }
 
       console.log('📍 CREATE STEP 2 COMPLETE: User found:', user.email)
-      console.log('📍 CREATE STEP 3: Preparing profile insert...')
+      console.log('📍 CREATE STEP 3: Checking if profile already exists for email...')
+      
+      // 🔧 NEW: Check if a profile with this email already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('email', user.email)
+        .single()
+
+      console.log('📍 CREATE STEP 3 COMPLETE: Existing profile check done')
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        // Real error (not just "no rows found")
+        console.error('❌ Error checking existing profile:', checkError)
+        console.log('📍 CREATE EXITING: Check error, setting loading to false')
+        setLoading(false)
+        return
+      }
+      
+      if (existingProfile) {
+        console.log('✅ Profile already exists for email:', user.email)
+        console.log('📍 CREATE STEP 4a: Using existing profile instead of creating new one')
+        console.log('📍 CREATE STEP 4a: Existing profile role:', existingProfile.role)
+        
+        // Update the existing profile with the current userId if needed
+        if (existingProfile.id !== userId) {
+          console.log('📍 CREATE STEP 4b: Updating existing profile with new userId...')
+          const { data: updatedProfile, error: updateError } = await supabase
+            .from('user_profiles')
+            .update({ id: userId })
+            .eq('email', user.email)
+            .select()
+            .single()
+            
+          if (updateError) {
+            console.error('❌ Error updating profile userId:', updateError)
+            console.log('📍 CREATE EXITING: Update error, setting loading to false')
+            setLoading(false)
+            return
+          }
+          
+          console.log('📍 CREATE STEP 4b COMPLETE: Profile userId updated')
+          setProfile(updatedProfile)
+        } else {
+          console.log('📍 CREATE STEP 4a: Profile userId already matches, using as-is')
+          setProfile(existingProfile)
+        }
+        
+        console.log('📍 CREATE STEP 5: Setting loading to false (existing profile)...')
+        setLoading(false)
+        console.log('📍 CREATE STEP 5 COMPLETE: Loading set to false - EXISTING PROFILE SUCCESS!')
+        return
+      }
+      
+      console.log('📍 CREATE STEP 4: No existing profile found, proceeding with insert...')
       console.log('📝 Creating profile for user:', user.email)
       
-      console.log('📍 CREATE STEP 4: Executing insert query...')
+      console.log('📍 CREATE STEP 5: Executing insert query...')
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -55,33 +109,33 @@ export default function SignUpJune() {
         .select()
         .single()
 
-      console.log('📍 CREATE STEP 4 COMPLETE: Insert query completed')
+      console.log('📍 CREATE STEP 5 COMPLETE: Insert query completed')
 
       if (error) {
         console.error('❌ Error creating user profile:', error)
-        console.log('📍 CREATE STEP 5a: Error path - profile creation failed')
+        console.log('📍 CREATE STEP 6a: Error path - profile creation failed')
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
-        console.log('📍 CREATE STEP 5b: Signing out user...')
+        console.log('📍 CREATE STEP 6b: Signing out user...')
         await supabase.auth.signOut()
-        console.log('📍 CREATE STEP 5c: Sign out complete')
+        console.log('📍 CREATE STEP 6c: Sign out complete')
         // 🔧 IMPORTANT: Set loading to false even when signing out
         console.log('📍 CREATE EXITING: Error case, setting loading to false')
         setLoading(false)
         return
       }
 
-      console.log('📍 CREATE STEP 5: Success path - profile created')
+      console.log('📍 CREATE STEP 6: Success path - profile created')
       console.log('✅ Profile created successfully:', data.role)
       
-      console.log('📍 CREATE STEP 6: Setting profile state...')
+      console.log('📍 CREATE STEP 7: Setting profile state...')
       setProfile(data)
-      console.log('📍 CREATE STEP 6 COMPLETE: Profile state set')
+      console.log('📍 CREATE STEP 7 COMPLETE: Profile state set')
       
-      console.log('📍 CREATE STEP 7: Setting loading to false...')
+      console.log('📍 CREATE STEP 8: Setting loading to false...')
       // 🔧 CRITICAL FIX: Set loading to false when profile is successfully created
       setLoading(false)
-      console.log('📍 CREATE STEP 7 COMPLETE: Loading set to false - CREATE SUCCESS!')
+      console.log('📍 CREATE STEP 8 COMPLETE: Loading set to false - CREATE SUCCESS!')
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
