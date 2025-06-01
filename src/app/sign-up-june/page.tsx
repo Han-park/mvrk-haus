@@ -13,53 +13,6 @@ export default function SignUpJune() {
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
 
-  const fetchUserProfile = useCallback(async (userId: string) => {
-    console.log('📝 fetchUserProfile called for:', userId)
-    try {
-      console.log('🔍 Starting database query...')
-      
-      // Add a timeout to the query to prevent hanging
-      const queryPromise = supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 10000)
-      )
-
-      console.log('⏱️ Executing query with timeout...')
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-
-      console.log('📊 Query completed. Error:', error ? error.message : 'None')
-      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
-
-      if (error) {
-        // If no profile found (PGRST116), create a new one
-        if (error.code === 'PGRST116') {
-          console.log('❌ No profile found, creating new profile...')
-          await createUserProfile(userId)
-          return
-        }
-        console.error('❌ Error fetching user profile:', error)
-        return
-      }
-
-      console.log('✅ Profile fetched successfully:', data.role)
-      setProfile(data)
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('💥 Exception in fetchUserProfile:', errorMessage)
-      
-      // If it's a timeout, try creating a new profile
-      if (errorMessage === 'Query timeout') {
-        console.log('⏰ Query timed out, attempting to create new profile...')
-        await createUserProfile(userId)
-      }
-    }
-  }, [])
-
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
     try {
@@ -98,6 +51,62 @@ export default function SignUpJune() {
       await supabase.auth.signOut()
     }
   }, [])
+
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    console.log('📝 fetchUserProfile called for:', userId)
+    try {
+      console.log('🔍 Starting database query...')
+      
+      // Debug: Check current auth state
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔐 Current session exists:', !!session)
+      console.log('🔐 Session user ID:', session?.user?.id)
+      console.log('🔐 Session access token exists:', !!session?.access_token)
+      
+      // Add a timeout to the query to prevent hanging
+      const queryPromise = supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
+      )
+
+      console.log('⏱️ Executing query with timeout...')
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
+      console.log('📊 Query completed. Error:', error ? error.message : 'None')
+      console.log('📊 Query completed. Error code:', error ? error.code : 'None')
+      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
+
+      if (error) {
+        // If no profile found (PGRST116), create a new one
+        if (error.code === 'PGRST116') {
+          console.log('❌ No profile found, creating new profile...')
+          // Call createUserProfile directly to avoid dependency issues
+          await createUserProfile(userId)
+          return
+        }
+        console.error('❌ Error fetching user profile:', error)
+        console.error('❌ Full error object:', JSON.stringify(error, null, 2))
+        return
+      }
+
+      console.log('✅ Profile fetched successfully:', data.role)
+      setProfile(data)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('💥 Exception in fetchUserProfile:', errorMessage)
+      
+      // If it's a timeout, try creating a new profile
+      if (errorMessage === 'Query timeout') {
+        console.log('⏰ Query timed out, attempting to create new profile...')
+        await createUserProfile(userId)
+      }
+    }
+  }, [createUserProfile])
 
   useEffect(() => {
     // Get initial session and profile
