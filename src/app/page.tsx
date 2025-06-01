@@ -13,8 +13,9 @@ export default function Home() {
       {/* Footer */}
       <footer className="pb-30 bg-black">
         <div className="container mx-auto px-4 text-center font-roboto-mono text-sm">
-          <p className="text-gray-400">Website coming soon.</p>
+          <p className="text-gray-400">Public website coming soon.</p>
           <p className="text-gray-600">by MVRK CRAFT from MVRK HAUS.</p>
+          <p className="text-gray-600 mt-6">mvrkcrafts@gmail.com</p>
         </div>
       </footer>
     </div>
