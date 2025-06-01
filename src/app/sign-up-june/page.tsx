@@ -50,17 +50,23 @@ export default function SignUpJune() {
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
         await supabase.auth.signOut()
+        // 🔧 IMPORTANT: Set loading to false even when signing out
+        setLoading(false)
         return
       }
 
       console.log('✅ Profile created successfully:', data.role)
       setProfile(data)
+      // 🔧 CRITICAL FIX: Set loading to false when profile is successfully created
+      setLoading(false)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
       // If profile creation fails, sign the user out
       alert('Profile creation failed. Please sign in again.')
       await supabase.auth.signOut()
+      // 🔧 IMPORTANT: Set loading to false even when signing out
+      setLoading(false)
     }
   }, [])
 
@@ -93,6 +99,7 @@ export default function SignUpJune() {
         const corsTestEnd = Date.now()
         
         console.log(`🧪 CORS test completed in ${corsTestEnd - corsTestStart}ms`)
+        console.log('🧪 CORS test data:', corsTest)
         console.log('🧪 CORS test error:', corsError ? corsError.message : 'None')
         console.log('🧪 CORS test success:', !corsError)
         
@@ -200,6 +207,8 @@ export default function SignUpJune() {
 
       console.log('✅ Profile fetched successfully:', data.role)
       setProfile(data)
+      // 🔧 CRITICAL FIX: Set loading to false when profile is successfully fetched
+      setLoading(false)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in fetchUserProfile:', errorMessage)
