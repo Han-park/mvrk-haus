@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
@@ -12,6 +12,92 @@ export default function SignUpJune() {
   const [loading, setLoading] = useState(true)
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
+
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    console.log('📝 fetchUserProfile called for:', userId)
+    try {
+      console.log('🔍 Starting database query...')
+      
+      // Add a timeout to the query to prevent hanging
+      const queryPromise = supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
+      )
+
+      console.log('⏱️ Executing query with timeout...')
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
+      console.log('📊 Query completed. Error:', error ? error.message : 'None')
+      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
+
+      if (error) {
+        // If no profile found (PGRST116), create a new one
+        if (error.code === 'PGRST116') {
+          console.log('❌ No profile found, creating new profile...')
+          await createUserProfile(userId)
+          return
+        }
+        console.error('❌ Error fetching user profile:', error)
+        return
+      }
+
+      console.log('✅ Profile fetched successfully:', data.role)
+      setProfile(data)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('💥 Exception in fetchUserProfile:', errorMessage)
+      
+      // If it's a timeout, try creating a new profile
+      if (errorMessage === 'Query timeout') {
+        console.log('⏰ Query timed out, attempting to create new profile...')
+        await createUserProfile(userId)
+      }
+    }
+  }, [])
+
+  const createUserProfile = useCallback(async (userId: string) => {
+    console.log('🔨 createUserProfile called for:', userId)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        console.error('❌ No user found in session')
+        return
+      }
+
+      console.log('📝 Creating profile for user:', user.email)
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: user.email || '',
+          role: 'awaiting_match'
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ Error creating user profile:', error)
+        // If we can't create a profile, sign the user out
+        alert('Profile creation failed. Please sign in again.')
+        await supabase.auth.signOut()
+        return
+      }
+
+      console.log('✅ Profile created successfully:', data.role)
+      setProfile(data)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('💥 Exception in createUserProfile:', errorMessage)
+      // If profile creation fails, sign the user out
+      alert('Profile creation failed. Please sign in again.')
+      await supabase.auth.signOut()
+    }
+  }, [])
 
   useEffect(() => {
     // Get initial session and profile
@@ -51,91 +137,7 @@ export default function SignUpJune() {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
-
-  const fetchUserProfile = async (userId: string) => {
-    console.log('📝 fetchUserProfile called for:', userId)
-    try {
-      console.log('🔍 Starting database query...')
-      
-      // Add a timeout to the query to prevent hanging
-      const queryPromise = supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 10000)
-      )
-
-      console.log('⏱️ Executing query with timeout...')
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
-
-      console.log('📊 Query completed. Error:', error ? error.message : 'None')
-      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
-
-      if (error) {
-        // If no profile found (PGRST116), create a new one
-        if (error.code === 'PGRST116') {
-          console.log('❌ No profile found, creating new profile...')
-          await createUserProfile(userId)
-          return
-        }
-        console.error('❌ Error fetching user profile:', error)
-        return
-      }
-
-      console.log('✅ Profile fetched successfully:', data.role)
-      setProfile(data)
-    } catch (error: any) {
-      console.error('💥 Exception in fetchUserProfile:', error.message)
-      
-      // If it's a timeout, try creating a new profile
-      if (error.message === 'Query timeout') {
-        console.log('⏰ Query timed out, attempting to create new profile...')
-        await createUserProfile(userId)
-      }
-    }
-  }
-
-  const createUserProfile = async (userId: string) => {
-    console.log('🔨 createUserProfile called for:', userId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        console.error('❌ No user found in session')
-        return
-      }
-
-      console.log('📝 Creating profile for user:', user.email)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: userId,
-          email: user.email || '',
-          role: 'awaiting_match'
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('❌ Error creating user profile:', error)
-        // If we can't create a profile, sign the user out
-        alert('Profile creation failed. Please sign in again.')
-        await signOut()
-        return
-      }
-
-      console.log('✅ Profile created successfully:', data.role)
-      setProfile(data)
-    } catch (error) {
-      console.error('💥 Exception in createUserProfile:', error)
-      // If profile creation fails, sign the user out
-      alert('Profile creation failed. Please sign in again.')
-      await signOut()
-    }
-  }
+  }, [fetchUserProfile])
 
   const signInWithGoogle = async () => {
     setLoading(true)
