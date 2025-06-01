@@ -10,8 +10,14 @@ export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
+
+  // Ensure component is mounted before accessing browser APIs
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
@@ -149,6 +155,8 @@ export default function SignUpJune() {
   }, [fetchUserProfile])
 
   const signInWithGoogle = async () => {
+    if (!mounted) return // Prevent execution before mount
+    
     setLoading(true)
     try {
       // Determine the correct redirect URL based on environment
@@ -211,16 +219,16 @@ export default function SignUpJune() {
     newPasscode[index] = value
     setPasscode(newPasscode)
     
-    // Auto-focus next input
-    if (value && index < 7) {
+    // Auto-focus next input - only after component is mounted
+    if (mounted && value && index < 7) {
       const nextInput = document.getElementById(`passcode-${index + 1}`)
       nextInput?.focus()
     }
   }
 
   const handlePasscodeKeyDown = (index: number, e: React.KeyboardEvent) => {
-    // Handle backspace
-    if (e.key === 'Backspace' && !passcode[index] && index > 0) {
+    // Handle backspace - only after component is mounted
+    if (mounted && e.key === 'Backspace' && !passcode[index] && index > 0) {
       const prevInput = document.getElementById(`passcode-${index - 1}`)
       prevInput?.focus()
     }
@@ -237,10 +245,12 @@ export default function SignUpJune() {
     
     setPasscode(newPasscode)
     
-    // Focus the next empty input or the last input
-    const nextEmptyIndex = pastedData.length < 8 ? pastedData.length : 7
-    const nextInput = document.getElementById(`passcode-${nextEmptyIndex}`)
-    nextInput?.focus()
+    // Focus the next empty input or the last input - only after component is mounted
+    if (mounted) {
+      const nextEmptyIndex = pastedData.length < 8 ? pastedData.length : 7
+      const nextInput = document.getElementById(`passcode-${nextEmptyIndex}`)
+      nextInput?.focus()
+    }
   }
 
   const submitPasscode = async () => {
@@ -534,7 +544,7 @@ export default function SignUpJune() {
 
               <button
                 onClick={signInWithGoogle}
-                disabled={loading}
+                disabled={loading || !mounted}
                 className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -555,7 +565,7 @@ export default function SignUpJune() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
+                <span>{loading ? 'Connecting...' : (!mounted ? 'Loading...' : 'Continue with Google')}</span>
               </button>
 
               <div className="mt-6 text-center">
@@ -585,4 +595,4 @@ export default function SignUpJune() {
       </div>
     </div>
   )
-} 
+}
