@@ -56,11 +56,24 @@ export default function SignUpJune() {
   const fetchUserProfile = async (userId: string) => {
     console.log('📝 fetchUserProfile called for:', userId)
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Starting database query...')
+      
+      // Add a timeout to the query to prevent hanging
+      const queryPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single()
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
+      )
+
+      console.log('⏱️ Executing query with timeout...')
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+
+      console.log('📊 Query completed. Error:', error ? error.message : 'None')
+      console.log('📊 Query completed. Data:', data ? 'Found' : 'Not found')
 
       if (error) {
         // If no profile found (PGRST116), create a new one
@@ -75,8 +88,14 @@ export default function SignUpJune() {
 
       console.log('✅ Profile fetched successfully:', data.role)
       setProfile(data)
-    } catch (error) {
-      console.error('💥 Exception in fetchUserProfile:', error)
+    } catch (error: any) {
+      console.error('💥 Exception in fetchUserProfile:', error.message)
+      
+      // If it's a timeout, try creating a new profile
+      if (error.message === 'Query timeout') {
+        console.log('⏰ Query timed out, attempting to create new profile...')
+        await createUserProfile(userId)
+      }
     }
   }
 
