@@ -244,28 +244,7 @@ export default function SignUpJune() {
       if (otpUpdateError) {
         console.error('Error updating OTP registration status:', otpUpdateError)
         console.error('Error details:', JSON.stringify(otpUpdateError, null, 2))
-        
-        // If the error is related to RLS policy, try using a server-side update
-        if (otpUpdateError.message?.includes('policy') || otpUpdateError.code === '42501') {
-          console.log('Attempting server-side update due to RLS policy restriction')
-          try {
-            const response = await fetch('/api/update-otp-status', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ passcode: code })
-            })
-            
-            if (response.ok) {
-              console.log('Successfully updated via server-side API')
-            } else {
-              console.error('Server-side update failed:', await response.text())
-            }
-          } catch (serverError) {
-            console.error('Server-side update error:', serverError)
-          }
-        }
+        // Don't fail the process if this update fails, just log it
       } else {
         console.log('Successfully updated june-otp table:', updateData)
       }
