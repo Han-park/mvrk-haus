@@ -196,10 +196,18 @@ export default function SignUpJune() {
         const corsTestStart = Date.now()
         
         console.log('📍 STEP 3b: Executing CORS test query...')
-        const { data: corsTest, error: corsError } = await supabase
+        
+        // 🔧 Add timeout to CORS test to prevent hanging
+        const corsTestPromise = supabase
           .from('user_profiles')
           .select('count')
           .limit(1)
+        
+        const corsTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('CORS test timeout')), 5000)
+        )
+        
+        const { data: corsTest, error: corsError } = await Promise.race([corsTestPromise, corsTimeoutPromise])
         const corsTestEnd = Date.now()
         
         console.log('📍 STEP 3c: CORS test query completed')
@@ -218,9 +226,16 @@ export default function SignUpJune() {
         console.log('📍 STEP 3 COMPLETE: CORS test passed')
       } catch (corsTestError) {
         console.error('💥 CORS test exception:', corsTestError)
-        console.log('📍 EXITING: CORS test exception, setting loading to false')
-        setLoading(false)
-        return
+        
+        // If it's a timeout, continue anyway but log it
+        if (corsTestError instanceof Error && corsTestError.message === 'CORS test timeout') {
+          console.log('⏰ CORS test timed out, but continuing with profile fetch...')
+          console.log('📍 STEP 3 TIMEOUT: Proceeding despite CORS test timeout')
+        } else {
+          console.log('📍 EXITING: CORS test exception, setting loading to false')
+          setLoading(false)
+          return
+        }
       }
       
       console.log('📍 STEP 4: Starting RLS permissions test...')
