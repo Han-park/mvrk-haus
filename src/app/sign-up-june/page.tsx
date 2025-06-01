@@ -204,6 +204,8 @@ export default function SignUpJune() {
         return
       }
 
+      console.log('Found OTP data:', otpData)
+
       // Update user profile with new role and OTP data
       const { error: updateError } = await supabase
         .from('user_profiles')
@@ -232,14 +234,40 @@ export default function SignUpJune() {
       }
 
       // Mark the passcode as registered in june-otp table
-      const { error: otpUpdateError } = await supabase
+      console.log('Attempting to update june-otp table with passcode:', code)
+      const { data: updateData, error: otpUpdateError } = await supabase
         .from('june-otp')
         .update({ is_register: true })
         .eq('passcode', code)
+        .select()
 
       if (otpUpdateError) {
         console.error('Error updating OTP registration status:', otpUpdateError)
-        // Don't fail the process if this update fails, just log it
+        console.error('Error details:', JSON.stringify(otpUpdateError, null, 2))
+        
+        // If the error is related to RLS policy, try using a server-side update
+        if (otpUpdateError.message?.includes('policy') || otpUpdateError.code === '42501') {
+          console.log('Attempting server-side update due to RLS policy restriction')
+          try {
+            const response = await fetch('/api/update-otp-status', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ passcode: code })
+            })
+            
+            if (response.ok) {
+              console.log('Successfully updated via server-side API')
+            } else {
+              console.error('Server-side update failed:', await response.text())
+            }
+          } catch (serverError) {
+            console.error('Server-side update error:', serverError)
+          }
+        }
+      } else {
+        console.log('Successfully updated june-otp table:', updateData)
       }
 
       // Refresh the user profile to show updated role
