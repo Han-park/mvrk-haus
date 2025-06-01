@@ -3,15 +3,14 @@
 import { useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { Mesh, MeshStandardMaterial, Object3D } from 'three';
-import { GLTF } from 'three-stdlib';
+import { Mesh, MeshStandardMaterial, Object3D, Material } from 'three';
 
-type GLTFResult = GLTF & {
+type GLTFResult = {
   nodes: {
     [key: string]: Object3D;
   };
   materials: {
-    [key: string]: MeshStandardMaterial;
+    [key: string]: Material;
   };
 };
 
