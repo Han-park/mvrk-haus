@@ -27,14 +27,24 @@ export default function SignUpJune() {
 
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
+    console.log('📍 CREATE STEP 1: Starting createUserProfile...')
+    
     try {
+      console.log('📍 CREATE STEP 2: Getting user from session...')
       const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
         console.error('❌ No user found in session')
+        console.log('📍 CREATE EXITING: No user in session, setting loading to false')
+        setLoading(false)
         return
       }
 
+      console.log('📍 CREATE STEP 2 COMPLETE: User found:', user.email)
+      console.log('📍 CREATE STEP 3: Preparing profile insert...')
       console.log('📝 Creating profile for user:', user.email)
+      
+      console.log('📍 CREATE STEP 4: Executing insert query...')
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -45,41 +55,66 @@ export default function SignUpJune() {
         .select()
         .single()
 
+      console.log('📍 CREATE STEP 4 COMPLETE: Insert query completed')
+
       if (error) {
         console.error('❌ Error creating user profile:', error)
+        console.log('📍 CREATE STEP 5a: Error path - profile creation failed')
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
+        console.log('📍 CREATE STEP 5b: Signing out user...')
         await supabase.auth.signOut()
+        console.log('📍 CREATE STEP 5c: Sign out complete')
         // 🔧 IMPORTANT: Set loading to false even when signing out
+        console.log('📍 CREATE EXITING: Error case, setting loading to false')
         setLoading(false)
         return
       }
 
+      console.log('📍 CREATE STEP 5: Success path - profile created')
       console.log('✅ Profile created successfully:', data.role)
+      
+      console.log('📍 CREATE STEP 6: Setting profile state...')
       setProfile(data)
+      console.log('📍 CREATE STEP 6 COMPLETE: Profile state set')
+      
+      console.log('📍 CREATE STEP 7: Setting loading to false...')
       // 🔧 CRITICAL FIX: Set loading to false when profile is successfully created
       setLoading(false)
+      console.log('📍 CREATE STEP 7 COMPLETE: Loading set to false - CREATE SUCCESS!')
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
+      console.log('📍 CREATE EXCEPTION: Caught in outer try-catch')
+      
       // If profile creation fails, sign the user out
       alert('Profile creation failed. Please sign in again.')
+      console.log('📍 CREATE EXCEPTION: Signing out user...')
       await supabase.auth.signOut()
+      console.log('📍 CREATE EXCEPTION: Sign out complete')
+      
       // 🔧 IMPORTANT: Set loading to false even when signing out
+      console.log('📍 CREATE EXITING: Exception case, setting loading to false')
       setLoading(false)
     }
   }, [])
 
   const fetchUserProfile = useCallback(async (userId: string) => {
     console.log('📝 fetchUserProfile called for:', userId)
+    console.log('🔍 Starting database query...')
+    
     try {
-      console.log('🔍 Starting database query...')
+      console.log('📍 STEP 1: Getting session...')
       
       // Debug: Check current auth state
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('📍 STEP 1 COMPLETE: Session retrieved')
       console.log('🔐 Current session exists:', !!session)
       console.log('🔐 Session user ID:', session?.user?.id)
       console.log('🔐 Session access token exists:', !!session?.access_token)
+      
+      console.log('📍 STEP 2: Network environment check...')
       
       // 🔧 DEBUG: Check network environment
       console.log('🌐 Network debug:', {
@@ -88,16 +123,23 @@ export default function SignUpJune() {
         hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       })
       
+      console.log('📍 STEP 2 COMPLETE: Network check done')
+      console.log('📍 STEP 3: Starting CORS test...')
+      
       // 🔧 CORS TEST: Try a simple connection test first
       console.log('🧪 Testing CORS with simple query...')
       try {
+        console.log('📍 STEP 3a: Creating CORS test query...')
         const corsTestStart = Date.now()
+        
+        console.log('📍 STEP 3b: Executing CORS test query...')
         const { data: corsTest, error: corsError } = await supabase
           .from('user_profiles')
           .select('count')
           .limit(1)
         const corsTestEnd = Date.now()
         
+        console.log('📍 STEP 3c: CORS test query completed')
         console.log(`🧪 CORS test completed in ${corsTestEnd - corsTestStart}ms`)
         console.log('🧪 CORS test data:', corsTest)
         console.log('🧪 CORS test error:', corsError ? corsError.message : 'None')
@@ -105,18 +147,26 @@ export default function SignUpJune() {
         
         if (corsError) {
           console.error('🚫 CORS test failed:', JSON.stringify(corsError, null, 2))
+          console.log('📍 EXITING: CORS test failed, setting loading to false')
           setLoading(false)
           return
         }
+        
+        console.log('📍 STEP 3 COMPLETE: CORS test passed')
       } catch (corsTestError) {
         console.error('💥 CORS test exception:', corsTestError)
+        console.log('📍 EXITING: CORS test exception, setting loading to false')
         setLoading(false)
         return
       }
       
+      console.log('📍 STEP 4: Starting RLS permissions test...')
+      
       // 🔧 RLS PERMISSIONS TEST: Test database access with different approaches
       console.log('🔒 Testing RLS permissions...')
       try {
+        console.log('📍 STEP 4a: RLS test 1 - table access...')
+        
         // Test 1: Check if we can access the table at all
         const rls1Start = Date.now()
         const { data: rls1Data, error: rls1Error } = await supabase
@@ -125,9 +175,12 @@ export default function SignUpJune() {
           .limit(1)
         const rls1End = Date.now()
         
+        console.log('📍 STEP 4a COMPLETE: RLS test 1 done')
         console.log(`🔒 RLS test 1 (table access) completed in ${rls1End - rls1Start}ms`)
         console.log('🔒 RLS test 1 error:', rls1Error ? rls1Error.message : 'None')
         console.log('🔒 RLS test 1 data count:', rls1Data ? rls1Data.length : 0)
+        
+        console.log('📍 STEP 4b: RLS test 2 - user filter...')
         
         // Test 2: Check if we can access our specific user ID
         const rls2Start = Date.now()
@@ -137,9 +190,12 @@ export default function SignUpJune() {
           .eq('id', userId)
         const rls2End = Date.now()
         
+        console.log('📍 STEP 4b COMPLETE: RLS test 2 done')
         console.log(`🔒 RLS test 2 (user filter) completed in ${rls2End - rls2Start}ms`)
         console.log('🔒 RLS test 2 error:', rls2Error ? rls2Error.message : 'None')
         console.log('🔒 RLS test 2 data:', rls2Data)
+        
+        console.log('📍 STEP 4c: Auth context check...')
         
         // Test 3: Check authentication context
         console.log('🔒 Auth context check:', {
@@ -150,21 +206,29 @@ export default function SignUpJune() {
           userMetadata: session?.user?.user_metadata
         })
         
+        console.log('📍 STEP 4c COMPLETE: Auth context logged')
+        
         if (rls1Error || rls2Error) {
           console.error('🚫 RLS permission issue detected')
           console.error('🚫 RLS error details:', {
             tableAccess: rls1Error ? rls1Error.message : 'OK',
             userFilter: rls2Error ? rls2Error.message : 'OK'
           })
+          console.log('📍 EXITING: RLS permission issue, setting loading to false')
           setLoading(false)
           return
         }
         
+        console.log('📍 STEP 4 COMPLETE: RLS tests passed')
+        
       } catch (rlsError) {
         console.error('💥 RLS test exception:', rlsError)
+        console.log('📍 EXITING: RLS test exception, setting loading to false')
         setLoading(false)
         return
       }
+      
+      console.log('📍 STEP 5: Preparing main query...')
       
       // Add a timeout to the query to prevent hanging
       const queryPromise = supabase
@@ -177,23 +241,33 @@ export default function SignUpJune() {
         setTimeout(() => reject(new Error('Query timeout')), 10000)
       )
 
+      console.log('📍 STEP 5 COMPLETE: Query and timeout promises created')
       console.log('⏱️ Executing main query with timeout...')
+      
+      console.log('📍 STEP 6: Executing main query...')
       
       // 🔧 IMPROVED: Add more detailed logging
       const startTime = Date.now()
       const { data, error } = await Promise.race([queryPromise, timeoutPromise])
       const endTime = Date.now()
       
+      console.log('📍 STEP 6 COMPLETE: Main query completed')
       console.log(`📊 Query completed in ${endTime - startTime}ms`)
       console.log('📊 Query error:', error ? error.message : 'None')
       console.log('📊 Query error code:', error ? error.code : 'None')
       console.log('📊 Query data:', data ? 'Found' : 'Not found')
 
+      console.log('📍 STEP 7: Processing query results...')
+
       if (error) {
+        console.log('📍 STEP 7a: Error detected, checking error code...')
+        
         // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
           console.log('❌ No profile found, creating new profile...')
+          console.log('📍 CALLING: createUserProfile')
           await createUserProfile(userId)
+          console.log('📍 RETURNED FROM: createUserProfile')
           return
         }
         console.error('❌ Error fetching user profile:', error)
@@ -201,25 +275,38 @@ export default function SignUpJune() {
         
         // 🔧 IMPORTANT: Set loading to false even on error
         console.log('🔧 Setting loading to false due to error')
+        console.log('📍 EXITING: Query error, setting loading to false')
         setLoading(false)
         return
       }
 
+      console.log('📍 STEP 7b: Success path - profile found')
       console.log('✅ Profile fetched successfully:', data.role)
+      
+      console.log('📍 STEP 8: Setting profile state...')
       setProfile(data)
+      console.log('📍 STEP 8 COMPLETE: Profile state set')
+      
+      console.log('📍 STEP 9: Setting loading to false...')
       // 🔧 CRITICAL FIX: Set loading to false when profile is successfully fetched
       setLoading(false)
+      console.log('📍 STEP 9 COMPLETE: Loading set to false - SUCCESS!')
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in fetchUserProfile:', errorMessage)
+      console.log('📍 EXCEPTION: Caught in outer try-catch')
       
       // If it's a timeout, try creating a new profile
       if (errorMessage === 'Query timeout') {
         console.log('⏰ Query timed out, attempting to create new profile...')
+        console.log('📍 CALLING: createUserProfile (timeout)')
         await createUserProfile(userId)
+        console.log('📍 RETURNED FROM: createUserProfile (timeout)')
       } else {
         // 🔧 IMPORTANT: Set loading to false on any exception
         console.log('🔧 Setting loading to false due to exception')
+        console.log('📍 EXITING: Exception, setting loading to false')
         setLoading(false)
       }
     }
