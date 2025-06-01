@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
+import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
 
 export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
@@ -13,10 +14,15 @@ export default function SignUpJune() {
   const [mounted, setMounted] = useState(false)
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
+  
+  // 🐛 DEBUGGING: Toggle to test hydration issues
+  const [debugHydrationError, setDebugHydrationError] = useState(false)
 
   // Ensure component is mounted before accessing browser APIs
   useEffect(() => {
+    debugHydration('SignUpJune')
     setMounted(true)
+    debugMountState('SignUpJune', true)
   }, [])
 
   const createUserProfile = useCallback(async (userId: string) => {
@@ -154,19 +160,19 @@ export default function SignUpJune() {
     return () => subscription.unsubscribe()
   }, [fetchUserProfile])
 
-  const signInWithGoogle = async () => {
-    if (!mounted) return // Prevent execution before mount
-    
+  // TEMPORARY: Create a version that reproduces the hydration issue
+  const signInWithGoogleBROKEN = async () => {
+    // This will cause hydration errors in desktop Chrome
     setLoading(true)
     try {
-      // Determine the correct redirect URL based on environment
       const isProduction = process.env.NODE_ENV === 'production'
+      // ❌ This line causes the hydration error - accessing window during SSR
       const baseUrl = isProduction ? 'https://mvrk.haus' : window.location.origin
       
       console.log('🔗 Google OAuth Debug Info:', {
         isProduction,
         baseUrl,
-        currentOrigin: window.location.origin,
+        currentOrigin: window.location.origin, // ❌ Another hydration error
         redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
       })
       
@@ -189,6 +195,65 @@ export default function SignUpJune() {
       }
     } catch (error) {
       console.error('💥 Unexpected error during Google OAuth:', error)
+      alert('An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const signInWithGoogle = async () => {
+    debugLog('SignUpJune', 'signInWithGoogle called', { mounted })
+    
+    if (!mounted) {
+      debugLog('SignUpJune', 'signInWithGoogle blocked - component not mounted')
+      return // Prevent execution before mount
+    }
+    
+    setLoading(true)
+    try {
+      // 🔧 FIXED: Dynamic URL configuration based on actual environment
+      const currentOrigin = window.location.origin
+      const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
+      
+      // Use actual current origin instead of hardcoded production URL
+      const baseUrl = isLocalhost ? currentOrigin : 'https://mvrk.haus'
+      
+      debugLog('SignUpJune', 'OAuth configuration', {
+        currentOrigin,
+        isLocalhost,
+        baseUrl,
+        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+      })
+      
+      console.log('🔗 Google OAuth Debug Info:', {
+        currentOrigin,
+        isLocalhost,
+        baseUrl,
+        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+      })
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      })
+      
+      if (error) {
+        console.error('❌ Error signing in with Google:', error)
+        debugLog('SignUpJune', 'OAuth error', error)
+        alert('Error signing in: ' + error.message)
+      } else {
+        console.log('✅ Google OAuth redirect initiated successfully')
+        debugLog('SignUpJune', 'OAuth redirect initiated successfully')
+      }
+    } catch (error) {
+      console.error('💥 Unexpected error during Google OAuth:', error)
+      debugLog('SignUpJune', 'OAuth unexpected error', error)
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -418,6 +483,26 @@ export default function SignUpJune() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
           <p className="text-gray-400">members only</p>
+          
+          {/* 🐛 DEBUGGING CONTROLS - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 p-4 bg-red-900/20 border border-red-500/30 rounded">
+              <h3 className="text-red-400 font-semibold mb-2">🐛 Hydration Debug Mode</h3>
+              <button
+                onClick={() => setDebugHydrationError(!debugHydrationError)}
+                className={`px-4 py-2 rounded text-sm font-medium ${
+                  debugHydrationError 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-green-600 text-white'
+                }`}
+              >
+                {debugHydrationError ? '❌ Using BROKEN version (hydration errors)' : '✅ Using FIXED version (safe)'}
+              </button>
+              <p className="text-xs text-gray-400 mt-2">
+                Toggle to test hydration issues. BROKEN version will fail on desktop Chrome.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -543,7 +628,7 @@ export default function SignUpJune() {
               </div>
 
               <button
-                onClick={signInWithGoogle}
+                onClick={debugHydrationError ? signInWithGoogleBROKEN : signInWithGoogle}
                 disabled={loading || !mounted}
                 className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
@@ -565,7 +650,10 @@ export default function SignUpJune() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                <span>{loading ? 'Connecting...' : (!mounted ? 'Loading...' : 'Continue with Google')}</span>
+                <span>
+                  {loading ? 'Connecting...' : (!mounted ? 'Loading...' : 'Continue with Google')}
+                  {debugHydrationError && ' (⚠️ BROKEN)'}
+                </span>
               </button>
 
               <div className="mt-6 text-center">

@@ -24,4 +24,44 @@ export async function createClient() {
       },
     }
   )
+}
+
+// Helper to get user session on server side
+export async function getServerSession() {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (error) {
+      console.error('Error getting server session:', error)
+      return { user: null, error }
+    }
+    
+    return { user, error: null }
+  } catch (error) {
+    console.error('Exception getting server session:', error)
+    return { user: null, error }
+  }
+}
+
+// Helper to get user profile on server side
+export async function getServerUserProfile(userId: string) {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    
+    if (error) {
+      console.error('Error getting server user profile:', error)
+      return { profile: null, error }
+    }
+    
+    return { profile: data, error: null }
+  } catch (error) {
+    console.error('Exception getting server user profile:', error)
+    return { profile: null, error }
+  }
 } 
