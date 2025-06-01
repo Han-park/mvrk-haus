@@ -16,13 +16,17 @@ export default function SignUpJune() {
   useEffect(() => {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
+      console.log('🔄 Starting getSessionAndProfile...')
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('📊 Session result:', session ? 'Session found' : 'No session')
       setUser(session?.user ?? null)
       
       if (session?.user) {
+        console.log('👤 User found, fetching profile for:', session.user.id)
         await fetchUserProfile(session.user.id)
       }
       
+      console.log('✅ Setting loading to false')
       setLoading(false)
     }
 
@@ -31,14 +35,17 @@ export default function SignUpJune() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
         setUser(session?.user ?? null)
         
         if (session?.user) {
+          console.log('👤 Auth change - fetching profile for:', session.user.id)
           await fetchUserProfile(session.user.id)
         } else {
           setProfile(null)
         }
         
+        console.log('✅ Auth change - setting loading to false')
         setLoading(false)
       }
     )
@@ -47,6 +54,7 @@ export default function SignUpJune() {
   }, [])
 
   const fetchUserProfile = async (userId: string) => {
+    console.log('📝 fetchUserProfile called for:', userId)
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -57,28 +65,31 @@ export default function SignUpJune() {
       if (error) {
         // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
-          console.log('No profile found for user, creating new profile...')
+          console.log('❌ No profile found, creating new profile...')
           await createUserProfile(userId)
           return
         }
-        console.error('Error fetching user profile:', error)
+        console.error('❌ Error fetching user profile:', error)
         return
       }
 
+      console.log('✅ Profile fetched successfully:', data.role)
       setProfile(data)
     } catch (error) {
-      console.error('Error fetching user profile:', error)
+      console.error('💥 Exception in fetchUserProfile:', error)
     }
   }
 
   const createUserProfile = async (userId: string) => {
+    console.log('🔨 createUserProfile called for:', userId)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        console.error('No user found in session')
+        console.error('❌ No user found in session')
         return
       }
 
+      console.log('📝 Creating profile for user:', user.email)
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -90,16 +101,17 @@ export default function SignUpJune() {
         .single()
 
       if (error) {
-        console.error('Error creating user profile:', error)
+        console.error('❌ Error creating user profile:', error)
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
         await signOut()
         return
       }
 
+      console.log('✅ Profile created successfully:', data.role)
       setProfile(data)
     } catch (error) {
-      console.error('Error creating user profile:', error)
+      console.error('💥 Exception in createUserProfile:', error)
       // If profile creation fails, sign the user out
       alert('Profile creation failed. Please sign in again.')
       await signOut()
