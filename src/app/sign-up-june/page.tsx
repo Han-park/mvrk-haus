@@ -109,10 +109,14 @@ export default function SignUpJune() {
   const signInWithGoogle = async () => {
     setLoading(true)
     try {
+      // Determine the correct redirect URL based on environment
+      const isProduction = process.env.NODE_ENV === 'production'
+      const baseUrl = isProduction ? 'https://mvrk.haus' : window.location.origin
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/sign-up-june`
+          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
         }
       })
       if (error) {
