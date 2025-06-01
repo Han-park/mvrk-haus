@@ -63,31 +63,31 @@ export const ROLE_INFO: Record<UserRole, {
   description: string 
 }> = {
   awaiting_match: {
-    label: 'Awaiting Match',
+    label: '인증 대기중',
     color: 'red',
     emoji: '🔴',
     description: 'Pending membership verification'
   },
   no_membership: {
-    label: 'No Membership',
+    label: '멤버십 없음',
     color: 'red',
     emoji: '🔴',
     description: 'Restricted access'
   },
   general_member: {
-    label: 'member',
+    label: '멤버',
     color: 'yellow',
     emoji: '🟡',
     description: 'Active community member'
   },
   editor: {
-    label: 'Editor',
+    label: '에디터',
     color: 'green',
     emoji: '🟢',
-    description: 'Content creator'
+    description: 'Website content creator'
   },
   admin: {
-    label: 'Administrator',
+    label: '관리자',
     color: 'blue',
     emoji: '🔵',
     description: 'Full administrator'

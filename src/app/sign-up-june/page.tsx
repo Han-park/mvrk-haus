@@ -206,6 +206,67 @@ export default function SignUpJune() {
 
       console.log('Found OTP data:', otpData)
 
+      // Enhanced validation: Check if passcode is registered and user still exists
+      if (otpData.is_register && otpData.registered_user_id) {
+        // Check if the registered user still exists in auth.users
+        const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.getUserById(otpData.registered_user_id)
+        
+        if (!authCheckError && existingAuthUser.user) {
+          // User exists - check if it's the same user or different user
+          if (otpData.registered_user_id !== user!.id) {
+            alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
+            setPasscodeLoading(false)
+            return
+          }
+          // Same user trying to register again
+          alert('이 인증번호는 이미 사용되었습니다.')
+          setPasscodeLoading(false)
+          return
+        } else {
+          // User was deleted from auth - allow reclaim but log it
+          console.log('Registered user was deleted from auth, allowing passcode reclaim:', {
+            passcode: code,
+            deletedUserId: otpData.registered_user_id,
+            deletedEmail: otpData.registered_email,
+            newUserId: user!.id,
+            newEmail: user!.email
+          })
+        }
+      } else if (otpData.is_register && !otpData.registered_user_id) {
+        // Legacy registered entry without user tracking - block it
+        alert('이 인증번호는 이미 사용되었습니다. 다른 인증번호를 사용하거나 문의해주세요.')
+        setPasscodeLoading(false)
+        return
+      }
+
+      // Check if this passcode is already claimed by another user (redundant check but kept for safety)
+      if (otpData.registered_user_id && otpData.registered_user_id !== user!.id) {
+        alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
+        setPasscodeLoading(false)
+        return
+      }
+
+      // Check if current user already used a different passcode
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('user_profiles')
+        .select('role, "june-ot-legalName"')
+        .eq('id', user!.id)
+        .single()
+
+      if (profileCheckError) {
+        console.error('Error checking existing profile:', profileCheckError)
+        alert('Error checking profile. Please try again.')
+        setPasscodeLoading(false)
+        return
+      }
+
+      // If user already has general_member role, they've already used a passcode
+      if (existingProfile.role === 'general_member' && existingProfile['june-ot-legalName']) {
+        alert('이 계정은 이미 다른 인증번호로 등록되어 있습니다.')
+        setPasscodeLoading(false)
+        return
+      }
+
       // Update user profile with new role and OTP data
       const { error: updateError } = await supabase
         .from('user_profiles')
@@ -233,11 +294,16 @@ export default function SignUpJune() {
         return
       }
 
-      // Mark the passcode as registered in june-otp table
+      // Mark the passcode as registered and link it to this user
       console.log('Attempting to update june-otp table with passcode:', code)
       const { data: updateData, error: otpUpdateError } = await supabase
         .from('june-otp')
-        .update({ is_register: true })
+        .update({ 
+          is_register: true,
+          registered_user_id: user!.id,
+          registered_email: user!.email,
+          registered_at: new Date().toISOString()
+        })
         .eq('passcode', code)
         .select()
 
@@ -245,6 +311,7 @@ export default function SignUpJune() {
         console.error('Error updating OTP registration status:', otpUpdateError)
         console.error('Error details:', JSON.stringify(otpUpdateError, null, 2))
         // Don't fail the process if this update fails, just log it
+        alert('Profile updated successfully, but there was an issue updating the passcode status. Please contact support if you encounter any issues.')
       } else {
         console.log('Successfully updated june-otp table:', updateData)
       }
@@ -279,7 +346,6 @@ export default function SignUpJune() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
-          <h2 className="text-2xl mb-2">메버릭 웹 계정 만들기</h2>
           <p className="text-gray-400">members only</p>
         </div>
 
@@ -313,7 +379,7 @@ export default function SignUpJune() {
                 
                 {/* Role Information */}
                 <div className="mb-4">
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  <div className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
                     profile.role === 'admin' ? 'bg-blue-900/30 text-blue-400 border border-blue-500/30' :
                     profile.role === 'editor' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
                     profile.role === 'general_member' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
@@ -334,15 +400,15 @@ export default function SignUpJune() {
               
               <div className="space-y-4">
                 {profile.role === 'awaiting_match' && (
-                  <div className="bg-gray-800 border border-gray-600 rounded-lg p-6">
+                  <div className="bg-gray-800 border border-gray-600 p-6">
                     <div className="text-center mb-6">
                       <h4 className="text-lg font-semibold text-white mb-2">Enter Passcode</h4>
                       <p className="text-gray-400 text-sm">
-                        Enter the 8-digit passcode to complete your membership
+                        카카오톡으로 전달받은 8자리 숫자를 입력하세요.
                       </p>
                     </div>
                     
-                    <div className="flex justify-center space-x-2 mb-6">
+                    <div className="flex justify-center space-x-1 mb-6">
                       {passcode.map((digit, index) => (
                         <input
                           key={index}
@@ -354,7 +420,7 @@ export default function SignUpJune() {
                           onChange={(e) => handlePasscodeChange(index, e.target.value)}
                           onKeyDown={(e) => handlePasscodeKeyDown(index, e)}
                           onPaste={index === 0 ? handlePasscodePaste : undefined}
-                          className="w-12 h-14 text-center text-xl font-mono bg-gray-900 border-2 border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                          className="w-10 h-12 text-center text-xl font-mono bg-gray-900 border-1 border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                           autoComplete="off"
                           disabled={passcodeLoading}
                         />
@@ -364,13 +430,13 @@ export default function SignUpJune() {
                     <button
                       onClick={submitPasscode}
                       disabled={passcodeLoading || passcode.some(digit => !digit)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200"
                     >
                       {passcodeLoading ? 'Verifying...' : 'Verify Passcode'}
                     </button>
                     
                     <p className="text-xs text-gray-500 text-center mt-4">
-                      Contact support if you don't have a passcode
+                      일회용 비밀번호를 모르거나 인증에 문제가 있다면 Mvrk Crafts "박종한"에게 문의 부탁드립니다.
                     </p>
                   </div>
                 )}
@@ -382,9 +448,9 @@ export default function SignUpJune() {
                     className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    <span>Edit Profile</span>
+                    <span>프로필 수정</span>
                   </a>
                 )}
                 
@@ -393,13 +459,13 @@ export default function SignUpJune() {
                   disabled={loading}
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200"
                 >
-                  {loading ? 'Signing out...' : 'Sign Out'}
+                  {loading ? '로그아웃 중' : '로그아웃'}
                 </button>
               </div>
             </div>
           ) : (
             // User is not signed in
-            <div className="bg-gray-900 rounded-lg p-8">
+            <div className="bg-gray-900 p-8">
               <div className="text-center mb-8">
                 <h3 className="text-xl font-semibold mb-2">Get Started</h3>
                 <p className="text-gray-400">Sign up with your Google account</p>
@@ -408,7 +474,7 @@ export default function SignUpJune() {
               <button
                 onClick={signInWithGoogle}
                 disabled={loading}
-                className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-3"
+                className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -432,9 +498,6 @@ export default function SignUpJune() {
               </button>
 
               <div className="mt-6 text-center">
-                <p className="text-xs text-gray-500">
-                  By signing up, you agree to our Terms of Service and Privacy Policy
-                </p>
               </div>
             </div>
           )}
@@ -442,12 +505,21 @@ export default function SignUpJune() {
 
         {/* Back to home link */}
         <div className="text-center mt-12">
-          <a
-            href="/"
-            className="text-gray-400 hover:text-white transition-colors duration-200"
-          >
-            ← Back to Home
-          </a>
+          {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
+            <a
+              href="/directory"
+              className="text-gray-400 hover:text-white transition-colors duration-200"
+            >
+              Mvrk Directory →
+            </a>
+          ) : (
+            <a
+              href="/"
+              className="text-gray-400 hover:text-white transition-colors duration-200"
+            >
+              ← Back to Home
+            </a>
+          )}
         </div>
       </div>
     </div>

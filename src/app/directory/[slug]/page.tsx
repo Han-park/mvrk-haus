@@ -219,7 +219,7 @@ export default function UserProfilePage() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">You need to be logged in to view user profiles.</p>
+          <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
           <a 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"

@@ -165,7 +165,7 @@ export default function Directory() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">You need to be logged in to view the directory.</p>
+          <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
           <a 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
@@ -183,7 +183,7 @@ export default function Directory() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Restricted</h1>
-          <p className="text-gray-400 mb-6">You need an active membership to view the directory.</p>
+          <p className="text-gray-400 mb-6">디렉토리를 보기 위해서는 멤버십을 구독해야만 합니다.</p>
           <a 
             href="/" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
@@ -201,11 +201,11 @@ export default function Directory() {
         {/* Header */}
         <div className="mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS Directory</h1>
-          <p className="text-gray-400">Community members and preparatory users</p>
+          <p className="text-gray-400">메버릭 동료들을 쉽게 찾고 협업을 요청해보세요.</p>
         </div>
 
         {/* Role Tag Filters */}
-        <div className="mb-8">
+        <div className="mb-12">
           <h2 className="text-xl font-semibold mb-4">Filter by Role Tags</h2>
           <div className="flex flex-wrap gap-2">
             {roleTags.map(tag => (
@@ -258,7 +258,7 @@ export default function Directory() {
         )}
 
         {/* User Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {/* Registered Users */}
           {filteredRegisteredUsers.map(user => (
             <a 
