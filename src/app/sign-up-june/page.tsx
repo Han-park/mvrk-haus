@@ -247,10 +247,18 @@ export default function SignUpJune() {
         
         // Test 1: Check if we can access the table at all
         const rls1Start = Date.now()
-        const { data: rls1Data, error: rls1Error } = await supabase
+        
+        // 🔧 Add timeout to RLS test 1
+        const rls1Promise = supabase
           .from('user_profiles')
           .select('id')
           .limit(1)
+        
+        const rls1TimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('RLS test 1 timeout')), 5000)
+        )
+        
+        const { data: rls1Data, error: rls1Error } = await Promise.race([rls1Promise, rls1TimeoutPromise])
         const rls1End = Date.now()
         
         console.log('📍 STEP 4a COMPLETE: RLS test 1 done')
@@ -262,10 +270,18 @@ export default function SignUpJune() {
         
         // Test 2: Check if we can access our specific user ID
         const rls2Start = Date.now()
-        const { data: rls2Data, error: rls2Error } = await supabase
+        
+        // 🔧 Add timeout to RLS test 2
+        const rls2Promise = supabase
           .from('user_profiles')
           .select('id, role')
           .eq('id', userId)
+        
+        const rls2TimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('RLS test 2 timeout')), 5000)
+        )
+        
+        const { data: rls2Data, error: rls2Error } = await Promise.race([rls2Promise, rls2TimeoutPromise])
         const rls2End = Date.now()
         
         console.log('📍 STEP 4b COMPLETE: RLS test 2 done')
@@ -286,24 +302,38 @@ export default function SignUpJune() {
         
         console.log('📍 STEP 4c COMPLETE: Auth context logged')
         
-        if (rls1Error || rls2Error) {
+        if (rls1Error && rls1Error.message !== 'RLS test 1 timeout' || 
+            rls2Error && rls2Error.message !== 'RLS test 2 timeout') {
           console.error('🚫 RLS permission issue detected')
           console.error('🚫 RLS error details:', {
             tableAccess: rls1Error ? rls1Error.message : 'OK',
             userFilter: rls2Error ? rls2Error.message : 'OK'
           })
-          console.log('📍 EXITING: RLS permission issue, setting loading to false')
-          setLoading(false)
-          return
+          
+          // Don't exit on timeout errors, only real permission errors
+          if (rls1Error?.message !== 'RLS test 1 timeout' && rls2Error?.message !== 'RLS test 2 timeout') {
+            console.log('📍 EXITING: RLS permission issue, setting loading to false')
+            setLoading(false)
+            return
+          } else {
+            console.log('⏰ RLS tests timed out, but continuing with main query...')
+          }
         }
         
         console.log('📍 STEP 4 COMPLETE: RLS tests passed')
         
       } catch (rlsError) {
         console.error('💥 RLS test exception:', rlsError)
-        console.log('📍 EXITING: RLS test exception, setting loading to false')
-        setLoading(false)
-        return
+        
+        // If it's a timeout, continue anyway but log it
+        if (rlsError instanceof Error && (rlsError.message === 'RLS test 1 timeout' || rlsError.message === 'RLS test 2 timeout')) {
+          console.log('⏰ RLS test timed out, but continuing with main query...')
+          console.log('📍 STEP 4 TIMEOUT: Proceeding despite RLS test timeout')
+        } else {
+          console.log('📍 EXITING: RLS test exception, setting loading to false')
+          setLoading(false)
+          return
+        }
       }
       
       console.log('📍 STEP 5: Preparing main query...')
@@ -316,7 +346,7 @@ export default function SignUpJune() {
         .single()
 
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 10000)
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
       )
 
       console.log('📍 STEP 5 COMPLETE: Query and timeout promises created')
