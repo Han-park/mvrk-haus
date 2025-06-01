@@ -187,6 +187,52 @@ export default function SignUpJune() {
       })
       
       console.log('📍 STEP 2 COMPLETE: Network check done')
+      
+      // 🔧 DIAGNOSTIC: Simple database connection test first
+      console.log('🩺 DIAGNOSTIC: Testing basic database connectivity...')
+      try {
+        const diagStart = Date.now()
+        
+        // Test 1: Can we reach the database at all? (No RLS, no complex queries)
+        console.log('🩺 Testing basic connection with simple count query...')
+        const diagPromise = supabase.rpc('version') // Built-in PostgreSQL function
+        const diagTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Basic connectivity timeout')), 3000)
+        )
+        
+        const diagResult = await Promise.race([diagPromise, diagTimeoutPromise])
+        const diagEnd = Date.now()
+        
+        console.log(`🩺 Basic connectivity test: SUCCESS in ${diagEnd - diagStart}ms`)
+        console.log('🩺 Database is reachable:', !!diagResult)
+        
+      } catch (diagError) {
+        console.error('🩺 Basic connectivity test FAILED:', diagError)
+        console.log('🩺 This suggests fundamental database connectivity issues')
+        
+        // Try an even simpler test - just check if we can make any DB call
+        try {
+          console.log('🩺 Trying extremely basic health check...')
+          const healthPromise = supabase.from('user_profiles').select('count').limit(0) // No actual data
+          const healthTimeout = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Health check timeout')), 2000)
+          )
+          
+          await Promise.race([healthPromise, healthTimeout])
+          console.log('🩺 Health check passed - issue might be RLS related')
+          
+        } catch (healthError) {
+          console.error('🩺 Health check also failed:', healthError)
+          console.log('🩺 CONCLUSION: Database is completely unreachable or down')
+          
+          // Show user a specific error message and skip database tests
+          console.log('⚠️ Skipping all database tests due to connectivity issues')
+          setLoading(false)
+          alert('Database connectivity issues detected. Please check your internet connection or try again later.')
+          return
+        }
+      }
+      
       console.log('📍 STEP 3: Starting CORS test...')
       
       // 🔧 CORS TEST: Try a simple connection test first
