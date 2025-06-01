@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { User } from '@supabase/supabase-js'
+import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
 import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
 
@@ -154,16 +154,25 @@ export default function SignUpJune() {
     }
   }, [])
 
-  const fetchUserProfile = useCallback(async (userId: string) => {
+  const fetchUserProfile = useCallback(async (userId: string, existingSession?: Session | null) => {
     console.log('📝 fetchUserProfile called for:', userId)
     console.log('🔍 Starting database query...')
     
     try {
-      console.log('📍 STEP 1: Getting session...')
+      console.log('📍 STEP 1: Using provided session or getting new session...')
       
-      // Debug: Check current auth state
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('📍 STEP 1 COMPLETE: Session retrieved')
+      // 🔧 FIX: Use existing session if provided, otherwise get a new one
+      let session = existingSession
+      if (!session) {
+        console.log('📍 STEP 1a: No session provided, getting session from Supabase...')
+        const { data: { session: newSession } } = await supabase.auth.getSession()
+        session = newSession
+        console.log('📍 STEP 1a COMPLETE: Session retrieved from Supabase')
+      } else {
+        console.log('📍 STEP 1a: Using provided session')
+      }
+      
+      console.log('📍 STEP 1 COMPLETE: Session ready')
       console.log('🔐 Current session exists:', !!session)
       console.log('🔐 Session user ID:', session?.user?.id)
       console.log('🔐 Session access token exists:', !!session?.access_token)
@@ -377,7 +386,7 @@ export default function SignUpJune() {
         
         if (session?.user) {
           console.log('👤 User found, fetching profile for:', session.user.id)
-          await fetchUserProfile(session.user.id)
+          await fetchUserProfile(session.user.id, session)
         }
       } catch (error) {
         console.error('💥 Error in getSessionAndProfile:', error)
@@ -398,7 +407,7 @@ export default function SignUpJune() {
         try {
           if (session?.user) {
             console.log('👤 Auth change - fetching profile for:', session.user.id)
-            await fetchUserProfile(session.user.id)
+            await fetchUserProfile(session.user.id, session)
           } else {
             setProfile(null)
           }
