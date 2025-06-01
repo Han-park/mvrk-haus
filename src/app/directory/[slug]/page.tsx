@@ -303,7 +303,7 @@ export default function UserProfilePage() {
             <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
               {/* Avatar */}
               <div className="flex-shrink-0">
-                <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                <div className="w-32 h-32 bg-gray-600 flex items-center justify-center overflow-hidden">
                   {targetProfile.avatar_url ? (
                     <img 
                       src={targetProfile.avatar_url} 
@@ -326,7 +326,26 @@ export default function UserProfilePage() {
                 
                 {/* Bio */}
                 {targetProfile.bio && (
-                  <p className="text-gray-300 leading-relaxed mb-6 whitespace-pre-wrap">{targetProfile.bio}</p>
+                  <p className="text-gray-300 leading-relaxed mb-2 whitespace-pre-wrap">{targetProfile.bio}</p>
+                )}
+
+                {/* Role Tags */}
+                {targetProfile.roleTagIds && targetProfile.roleTagIds.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex flex-wrap gap-2">
+                      {targetProfile.roleTagIds.map(tagId => {
+                        const tag = roleTags.find(t => t.id === tagId)
+                        return tag ? (
+                          <span 
+                            key={tagId} 
+                            className="px-3 py-1 bg-gray-800 border border-gray-600 text-xs text-gray-300 hover:bg-gray-700 transition-colors"
+                          >
+                            {tag.roleTagName}
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  </div>
                 )}
 
                 {/* Instagram Button */}
@@ -335,37 +354,18 @@ export default function UserProfilePage() {
                     href={`https://instagram.com/${targetProfile.instagramId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white px-6 py-3 font-medium transition-all duration-200 transform hover:scale-105"
+                    className="inline-flex items-baseline space-x-1 bg-gray-300 text-black px-4 py-2 font-medium"
                   >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="transform rotate-315">
+                      <path d="M1.20308 1.04312C1.00481 0.954998 0.772341 1.0048 0.627577 1.16641C0.482813 1.32802 0.458794 1.56455 0.568117 1.75196L3.92115 7.50002L0.568117 13.2481C0.458794 13.4355 0.482813 13.672 0.627577 13.8336C0.772341 13.9952 1.00481 14.045 1.20308 13.9569L14.7031 7.95693C14.8836 7.87668 15 7.69762 15 7.50002C15 7.30243 14.8836 7.12337 14.7031 7.04312L1.20308 1.04312ZM4.84553 7.10002L2.21234 2.586L13.2689 7.50002L2.21234 12.414L4.84552 7.90002H9C9.22092 7.90002 9.4 7.72094 9.4 7.50002C9.4 7.27911 9.22092 7.10002 9 7.10002H4.84553Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
                     </svg>
-                    <span>Visit Instagram</span>
+                    <span>협업 요청하기</span>
                   </a>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Role Tags Section */}
-          {targetProfile.roleTagIds && targetProfile.roleTagIds.length > 0 && (
-            <div className="bg-gray-900 p-8 mb-8">
-              <h3 className="text-xl font-semibold text-white mb-4">Skills & Roles</h3>
-              <div className="flex flex-wrap gap-3">
-                {targetProfile.roleTagIds.map(tagId => {
-                  const tag = roleTags.find(t => t.id === tagId)
-                  return tag ? (
-                    <span 
-                      key={tagId} 
-                      className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-full text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                    >
-                      {tag.roleTagName}
-                    </span>
-                  ) : null
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Question Answers Section */}
           <div className="space-y-6">

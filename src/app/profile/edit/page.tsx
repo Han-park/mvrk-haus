@@ -48,6 +48,7 @@ export default function ProfileEdit() {
     mvrkName: '',
     bio: '',
     instagramId: '',
+    slug: '',
     roleTagIds: [] as number[],
     avatar_url: '',
     '1a': '',
@@ -101,6 +102,7 @@ export default function ProfileEdit() {
         mvrkName: profile.mvrkName || '',
         bio: profile.bio || '',
         instagramId: profile.instagramId || '',
+        slug: profile.slug || '',
         roleTagIds: profile.roleTagIds || [],
         avatar_url: profile.avatar_url || '',
         '1a': profile['1a'] || '',
@@ -180,6 +182,20 @@ export default function ProfileEdit() {
       ...prev,
       [field]: value
     }))
+  }
+
+  const validateSlug = (slug: string): boolean => {
+    // Allow only lowercase letters, numbers, and underscores
+    const slugRegex = /^[a-z0-9_]*$/
+    return slug.length <= 20 && slugRegex.test(slug)
+  }
+
+  const handleSlugChange = (value: string) => {
+    // Convert to lowercase and validate
+    const lowercaseValue = value.toLowerCase()
+    if (validateSlug(lowercaseValue)) {
+      handleInputChange('slug', lowercaseValue)
+    }
   }
 
   const toggleRoleTag = (tagId: number) => {
@@ -302,6 +318,7 @@ export default function ProfileEdit() {
           mvrkName: formData.mvrkName,
           bio: formData.bio,
           instagramId: formData.instagramId,
+          slug: formData.slug,
           roleTagIds: formData.roleTagIds,
           avatar_url: avatarUrl,
           '1a': formData['1a'],
@@ -498,6 +515,29 @@ export default function ProfileEdit() {
                     placeholder="your_instagram_handle"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Profile URL Slug
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 bg-gray-800 border border-r-0 border-gray-600 text-gray-400 text-sm">
+                    /directory/
+                  </span>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => handleSlugChange(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                    placeholder="your_custom_url"
+                    maxLength={20}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Only lowercase letters, numbers, and underscores allowed. Max 20 characters.
+                  {formData.slug && ` (${formData.slug.length}/20)`}
+                </p>
               </div>
             </div>
           </div>

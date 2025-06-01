@@ -232,21 +232,30 @@ export default function Directory() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-900 p-4">
-            <h3 className="text-lg font-semibold mb-2">Registered Members</h3>
-            <p className="text-2xl text-blue-400">{filteredRegisteredUsers.length}</p>
+        {/* Stats - Admin Only */}
+        {profile?.role === 'admin' && (
+          <div className="mb-8">
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 italic">
+                This status dashboard is only shown to administrators for community management purposes.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-900 p-4">
+                <h3 className="text-lg font-semibold mb-2">Registered Members</h3>
+                <p className="text-2xl text-blue-400">{filteredRegisteredUsers.length}</p>
+              </div>
+              <div className="bg-gray-900 p-4">
+                <h3 className="text-lg font-semibold mb-2">Preparatory Users</h3>
+                <p className="text-2xl text-yellow-400">{filteredPreparatoryUsers.length}</p>
+              </div>
+              <div className="bg-gray-900 p-4">
+                <h3 className="text-lg font-semibold mb-2">Total</h3>
+                <p className="text-2xl text-green-400">{filteredRegisteredUsers.length + filteredPreparatoryUsers.length}</p>
+              </div>
+            </div>
           </div>
-          <div className="bg-gray-900 p-4">
-            <h3 className="text-lg font-semibold mb-2">Preparatory Users</h3>
-            <p className="text-2xl text-yellow-400">{filteredPreparatoryUsers.length}</p>
-          </div>
-          <div className="bg-gray-900 p-4">
-            <h3 className="text-lg font-semibold mb-2">Total</h3>
-            <p className="text-2xl text-green-400">{filteredRegisteredUsers.length + filteredPreparatoryUsers.length}</p>
-          </div>
-        </div>
+        )}
 
         {/* User Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -258,7 +267,7 @@ export default function Directory() {
               className="bg-gray-900 p-6 border-l-4 border-green-500 hover:bg-gray-800 transition-colors duration-200 cursor-pointer block"
             >
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden mr-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden mr-3">
                   {user.avatar_url ? (
                     <img 
                       src={user.avatar_url} 
@@ -275,11 +284,11 @@ export default function Directory() {
                   <h3 className="font-semibold text-white">
                     {user.mvrkName || user['june-ot-legalName'] || 'Member'}
                   </h3>
-                  <p className="text-sm text-gray-400">{user.email}</p>
+                  <p className="text-sm text-gray-400">{user.instagramId ? `@${user.instagramId}` : ''}</p>
                 </div>
               </div>
               
-              <div className="mb-3">
+              {/* <div className="mb-3">
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                   user.role === 'admin' ? 'bg-blue-900/30 text-blue-400' :
                   user.role === 'editor' ? 'bg-green-900/30 text-green-400' :
@@ -288,7 +297,7 @@ export default function Directory() {
                 }`}>
                   {user.role === 'general_member' ? 'member' : user.role}
                 </span>
-              </div>
+              </div> */}
 
               {user.bio && (
                 <p className="text-sm text-gray-300 mb-3 line-clamp-2">{user.bio}</p>
@@ -312,9 +321,6 @@ export default function Directory() {
                 </div>
               )}
               
-              <div className="mt-3 text-xs text-gray-500">
-                Click to view full profile →
-              </div>
             </a>
           ))}
 
@@ -322,7 +328,7 @@ export default function Directory() {
           {filteredPreparatoryUsers.map(prepUser => (
             <div key={`prep-${prepUser.id}`} className="bg-gray-900 p-6 border-l-4 border-yellow-500">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-full flex items-center justify-center mr-3">
+                <div className="w-12 h-12 bg-gray-600 flex items-center justify-center mr-3">
                   <span className="text-lg font-bold">
                     {prepUser.legalName?.charAt(0).toUpperCase()}
                   </span>
@@ -333,11 +339,6 @@ export default function Directory() {
                 </div>
               </div>
               
-              <div className="mb-3">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-900/30 text-yellow-400">
-                  preparatory
-                </span>
-              </div>
 
               <p className="text-sm text-gray-400">Awaiting registration</p>
             </div>
