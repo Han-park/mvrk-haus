@@ -82,6 +82,83 @@ export default function SignUpJune() {
         hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       })
       
+      // 🔧 CORS TEST: Try a simple connection test first
+      console.log('🧪 Testing CORS with simple query...')
+      try {
+        const corsTestStart = Date.now()
+        const { data: corsTest, error: corsError } = await supabase
+          .from('user_profiles')
+          .select('count')
+          .limit(1)
+        const corsTestEnd = Date.now()
+        
+        console.log(`🧪 CORS test completed in ${corsTestEnd - corsTestStart}ms`)
+        console.log('🧪 CORS test error:', corsError ? corsError.message : 'None')
+        console.log('🧪 CORS test success:', !corsError)
+        
+        if (corsError) {
+          console.error('🚫 CORS test failed:', JSON.stringify(corsError, null, 2))
+          setLoading(false)
+          return
+        }
+      } catch (corsTestError) {
+        console.error('💥 CORS test exception:', corsTestError)
+        setLoading(false)
+        return
+      }
+      
+      // 🔧 RLS PERMISSIONS TEST: Test database access with different approaches
+      console.log('🔒 Testing RLS permissions...')
+      try {
+        // Test 1: Check if we can access the table at all
+        const rls1Start = Date.now()
+        const { data: rls1Data, error: rls1Error } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .limit(1)
+        const rls1End = Date.now()
+        
+        console.log(`🔒 RLS test 1 (table access) completed in ${rls1End - rls1Start}ms`)
+        console.log('🔒 RLS test 1 error:', rls1Error ? rls1Error.message : 'None')
+        console.log('🔒 RLS test 1 data count:', rls1Data ? rls1Data.length : 0)
+        
+        // Test 2: Check if we can access our specific user ID
+        const rls2Start = Date.now()
+        const { data: rls2Data, error: rls2Error } = await supabase
+          .from('user_profiles')
+          .select('id, role')
+          .eq('id', userId)
+        const rls2End = Date.now()
+        
+        console.log(`🔒 RLS test 2 (user filter) completed in ${rls2End - rls2Start}ms`)
+        console.log('🔒 RLS test 2 error:', rls2Error ? rls2Error.message : 'None')
+        console.log('🔒 RLS test 2 data:', rls2Data)
+        
+        // Test 3: Check authentication context
+        console.log('🔒 Auth context check:', {
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          aud: session?.user?.aud,
+          appMetadata: session?.user?.app_metadata,
+          userMetadata: session?.user?.user_metadata
+        })
+        
+        if (rls1Error || rls2Error) {
+          console.error('🚫 RLS permission issue detected')
+          console.error('🚫 RLS error details:', {
+            tableAccess: rls1Error ? rls1Error.message : 'OK',
+            userFilter: rls2Error ? rls2Error.message : 'OK'
+          })
+          setLoading(false)
+          return
+        }
+        
+      } catch (rlsError) {
+        console.error('💥 RLS test exception:', rlsError)
+        setLoading(false)
+        return
+      }
+      
       // Add a timeout to the query to prevent hanging
       const queryPromise = supabase
         .from('user_profiles')
@@ -93,7 +170,7 @@ export default function SignUpJune() {
         setTimeout(() => reject(new Error('Query timeout')), 10000)
       )
 
-      console.log('⏱️ Executing query with timeout...')
+      console.log('⏱️ Executing main query with timeout...')
       
       // 🔧 IMPROVED: Add more detailed logging
       const startTime = Date.now()
