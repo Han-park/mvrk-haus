@@ -155,18 +155,32 @@ export default function SignUpJune() {
       const isProduction = process.env.NODE_ENV === 'production'
       const baseUrl = isProduction ? 'https://mvrk.haus' : window.location.origin
       
+      console.log('🔗 Google OAuth Debug Info:', {
+        isProduction,
+        baseUrl,
+        currentOrigin: window.location.origin,
+        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+      })
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         }
       })
+      
       if (error) {
-        console.error('Error signing in:', error.message)
+        console.error('❌ Error signing in with Google:', error)
         alert('Error signing in: ' + error.message)
+      } else {
+        console.log('✅ Google OAuth redirect initiated successfully')
       }
     } catch (error) {
-      console.error('Unexpected error:', error)
+      console.error('💥 Unexpected error during Google OAuth:', error)
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
