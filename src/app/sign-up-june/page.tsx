@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
@@ -436,7 +437,7 @@ export default function SignUpJune() {
                     </button>
                     
                     <p className="text-xs text-gray-500 text-center mt-4">
-                      일회용 비밀번호를 모르거나 인증에 문제가 있다면 Mvrk Crafts "박종한"에게 문의 부탁드립니다.
+                      일회용 비밀번호를 모르거나 인증에 문제가 있다면 Mvrk Crafts &quot;박종한&quot;에게 문의 부탁드립니다.
                     </p>
                   </div>
                 )}
@@ -506,19 +507,19 @@ export default function SignUpJune() {
         {/* Back to home link */}
         <div className="text-center mt-12">
           {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
-            <a
+            <Link
               href="/directory"
               className="text-gray-400 hover:text-white transition-colors duration-200"
             >
               Mvrk Directory →
-            </a>
+            </Link>
           ) : (
-            <a
+            <Link
               href="/"
               className="text-gray-400 hover:text-white transition-colors duration-200"
             >
               ← Back to Home
-            </a>
+            </Link>
           )}
         </div>
       </div>

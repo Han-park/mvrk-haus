@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
@@ -107,13 +108,13 @@ export default function UserProfilePage() {
     }
   }
 
-  const fetchTargetProfile = async () => {
+  const fetchTargetProfile = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
       // First try to find by slug
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('slug', slug)
@@ -133,29 +134,30 @@ export default function UserProfilePage() {
           return
         }
 
-        data = idData
+        setTargetProfile(idData)
       } else if (error) {
         console.error('Error fetching target profile:', error)
         setError('Error loading user profile')
         setLoading(false)
         return
-      }
+      } else {
+        // Check if the target profile should be visible to current user
+        if (data.role === 'no_membership' || data.role === 'awaiting_match') {
+          setError('This profile is not available')
+          setLoading(false)
+          return
+        }
 
-      // Check if the target profile should be visible to current user
-      if (data.role === 'no_membership' || data.role === 'awaiting_match') {
-        setError('This profile is not available')
-        setLoading(false)
-        return
+        setTargetProfile(data)
       }
-
-      setTargetProfile(data)
+      
       setLoading(false)
     } catch (error) {
       console.error('Error fetching target profile:', error)
       setError('Error loading user profile')
       setLoading(false)
     }
-  }
+  }, [slug])
 
   const fetchQuestions = async () => {
     try {
@@ -220,12 +222,12 @@ export default function UserProfilePage() {
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Denied</h1>
           <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
-          <a 
+          <Link 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
           >
             Sign In
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -238,12 +240,12 @@ export default function UserProfilePage() {
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Restricted</h1>
           <p className="text-gray-400 mb-6">You need an active membership to view user profiles.</p>
-          <a 
+          <Link 
             href="/" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
           >
             Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -261,12 +263,12 @@ export default function UserProfilePage() {
           >
             Go Back
           </button>
-          <a 
+          <Link 
             href="/directory" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
           >
             View Directory
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -403,12 +405,12 @@ export default function UserProfilePage() {
             ← Go Back
           </button>
           <span className="text-gray-600">|</span>
-          <a
+          <Link
             href="/directory"
             className="text-gray-400 hover:text-white transition-colors duration-200"
           >
             View All Members
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
@@ -166,12 +167,12 @@ export default function Directory() {
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Denied</h1>
           <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
-          <a 
+          <Link 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
           >
             Sign In
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -184,12 +185,12 @@ export default function Directory() {
         <div className="text-center">
           <h1 className="text-2xl text-white mb-4">Access Restricted</h1>
           <p className="text-gray-400 mb-6">디렉토리를 보기 위해서는 멤버십을 구독해야만 합니다.</p>
-          <a 
+          <Link 
             href="/" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
           >
             Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -261,7 +262,7 @@ export default function Directory() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {/* Registered Users */}
           {filteredRegisteredUsers.map(user => (
-            <a 
+            <Link 
               key={user.id} 
               href={`/directory/${user.slug || user.id}`}
               className="bg-gray-900 p-6 border-l-4 border-green-500 hover:bg-gray-800 transition-colors duration-200 cursor-pointer block"
@@ -321,7 +322,7 @@ export default function Directory() {
                 </div>
               )}
               
-            </a>
+            </Link>
           ))}
 
           {/* Preparatory Users */}
@@ -340,7 +341,7 @@ export default function Directory() {
               </div>
               
 
-              <p className="text-sm text-gray-400">Awaiting registration</p>
+              <p className="text-sm text-gray-400">인증 대기중...</p>
             </div>
           ))}
         </div>
@@ -354,12 +355,12 @@ export default function Directory() {
 
         {/* Back to home */}
         <div className="text-center mt-12">
-          <a
+          <Link
             href="/"
             className="text-gray-400 hover:text-white transition-colors duration-200"
           >
             ← Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

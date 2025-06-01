@@ -177,7 +177,7 @@ export default function ProfileEdit() {
     return question?.question_name || FALLBACK_QUESTIONS[questionId] || questionId
   }
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -399,8 +399,6 @@ export default function ProfileEdit() {
       </div>
     )
   }
-
-  const questionIds = ['1a', '2a', '3a', '4a', '1b', '2b', '3b', '4b', '5b', '6b']
 
   return (
     <div className="min-h-screen bg-black text-white">
