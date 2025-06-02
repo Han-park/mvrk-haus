@@ -221,6 +221,17 @@ export default function SignUpJune() {
     try {
       console.log('📍 STEP 0: Auth service diagnostics...')
       
+      // 🔧 DOMAIN DIAGNOSTICS: Check for domain-related auth issues
+      console.log('🌐 DOMAIN DIAGNOSTIC: Current domain info...')
+      if (typeof window !== 'undefined') {
+        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.href:', window.location.href)
+        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.origin:', window.location.origin)
+        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.hostname:', window.location.hostname)
+        console.log('🌐 DOMAIN DIAGNOSTIC: Is www subdomain:', window.location.hostname.startsWith('www.'))
+        console.log('🌐 DOMAIN DIAGNOSTIC: Is vercel domain:', window.location.hostname.includes('vercel.app'))
+        console.log('🌐 DOMAIN DIAGNOSTIC: Is localhost:', window.location.hostname.includes('localhost'))
+      }
+      
       // 🔧 NEW: Comprehensive auth service check
       console.log('🏥 AUTH DIAGNOSTIC: Checking Supabase client state...')
       console.log('🏥 AUTH DIAGNOSTIC: Auth instance exists:', !!supabase.auth)
@@ -655,28 +666,54 @@ export default function SignUpJune() {
     
     setLoading(true)
     try {
-      // 🔧 FIXED: Dynamic URL configuration based on actual environment
+      // 🔧 DOMAIN FIX: More comprehensive domain handling for OAuth
       const currentOrigin = window.location.origin
-      const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
+      const hostname = window.location.hostname
       
-      // Use actual current origin instead of hardcoded production URL
-      const baseUrl = isLocalhost ? currentOrigin : 'https://www.mvrk.haus'
+      console.log('🔗 OAuth Domain Analysis:', {
+        currentOrigin,
+        hostname,
+        isWww: hostname.startsWith('www.'),
+        isVercel: hostname.includes('vercel.app'),
+        isLocalhost: hostname.includes('localhost') || hostname.includes('127.0.0.1')
+      })
+      
+      // 🔧 IMPROVED: Handle all your domain variants
+      let baseUrl: string
+      if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+        baseUrl = currentOrigin
+        console.log('🔗 Using localhost:', baseUrl)
+      } else if (hostname.includes('vercel.app')) {
+        baseUrl = currentOrigin
+        console.log('🔗 Using vercel domain:', baseUrl)
+      } else if (hostname === 'mvrk.haus') {
+        // Redirect users from non-www to www for consistency
+        baseUrl = 'https://www.mvrk.haus'
+        console.log('🔗 Using www redirect from non-www:', baseUrl)
+      } else if (hostname === 'www.mvrk.haus') {
+        baseUrl = currentOrigin
+        console.log('🔗 Using www domain:', baseUrl)
+      } else {
+        // Fallback to current origin
+        baseUrl = currentOrigin
+        console.log('🔗 Using fallback current origin:', baseUrl)
+      }
+      
       const fullRedirectUrl = `${baseUrl}/auth/callback?next=/sign-up-june`
       
       debugLog('SignUpJune', 'OAuth configuration', {
         currentOrigin,
-        isLocalhost,
+        hostname,
         baseUrl,
         redirectTo: fullRedirectUrl
       })
       
       console.log('🔗 Google OAuth Debug Info:', {
         currentOrigin,
-        isLocalhost,
+        hostname,
         baseUrl,
         fullRedirectUrl,
-        windowLocationHref: window.location.href,
-        windowLocationPathname: window.location.pathname
+        windowLocationHref: window.location.href
       })
       
       // 🔧 EXTRA DEBUG: Log exactly what we're sending to Supabase
