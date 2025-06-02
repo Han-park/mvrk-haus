@@ -219,349 +219,60 @@ export default function SignUpJune() {
     console.log('🔍 Starting database query...')
     
     try {
-      console.log('📍 STEP 0: Auth service diagnostics...')
-      
-      // 🔧 DOMAIN DIAGNOSTICS: Check for domain-related auth issues
-      console.log('🌐 DOMAIN DIAGNOSTIC: Current domain info...')
-      if (typeof window !== 'undefined') {
-        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.href:', window.location.href)
-        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.origin:', window.location.origin)
-        console.log('🌐 DOMAIN DIAGNOSTIC: window.location.hostname:', window.location.hostname)
-        console.log('🌐 DOMAIN DIAGNOSTIC: Is www subdomain:', window.location.hostname.startsWith('www.'))
-        console.log('🌐 DOMAIN DIAGNOSTIC: Is vercel domain:', window.location.hostname.includes('vercel.app'))
-        console.log('🌐 DOMAIN DIAGNOSTIC: Is localhost:', window.location.hostname.includes('localhost'))
-      }
-      
-      // 🔧 NEW: Comprehensive auth service check
-      console.log('🏥 AUTH DIAGNOSTIC: Checking Supabase client state...')
-      console.log('🏥 AUTH DIAGNOSTIC: Auth instance exists:', !!supabase.auth)
-      
-      // 🔧 PRODUCTION FIX: Use getSession() instead of getUser() for better performance
-      // Based on: https://github.com/supabase/supabase/discussions/20905
-      console.log('🏥 AUTH DIAGNOSTIC: Using getSession() instead of getUser() for production performance...')
-      try {
-        console.log('🏥 AUTH DIAGNOSTIC: Testing auth.getSession (with 2s timeout)...')
-        const sessionPromise = supabase.auth.getSession()
-        const sessionTimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('getSession timeout')), 2000)
-        )
-        
-        const sessionResult = await Promise.race([sessionPromise, sessionTimeoutPromise])
-        console.log('🏥 AUTH DIAGNOSTIC: getSession success:', !!sessionResult.data.session)
-        console.log('🏥 AUTH DIAGNOSTIC: getSession error:', sessionResult.error?.message || 'None')
-        
-        // If session exists, we can proceed without getUser() call
-        if (sessionResult.data.session) {
-          console.log('✅ Using session from getSession(), skipping problematic getUser() call')
-          // Set the session as our "existing session" to skip getUser() later
-          existingSession = sessionResult.data.session
-        }
-        
-      } catch (sessionError) {
-        console.log('🚨 AUTH DIAGNOSTIC: getSession failed/timed out:', sessionError)
-        // Continue anyway - this is expected to be more resilient
-      }
-      
-      console.log('📍 STEP 0 COMPLETE: Auth diagnostics done')
-      
-      console.log('📍 STEP 1: Using provided session or getting new session...')
-      
       // 🔧 FIX: Use existing session if provided, otherwise get a new one
       let session = existingSession
       if (!session) {
-        console.log('📍 STEP 1a: No session provided, getting session from Supabase...')
+        console.log('📍 Getting session from Supabase...')
         const { data: { session: newSession } } = await supabase.auth.getSession()
         session = newSession
-        console.log('📍 STEP 1a COMPLETE: Session retrieved from Supabase')
+        console.log('📍 Session retrieved from Supabase')
       } else {
-        console.log('📍 STEP 1a: Using provided session')
+        console.log('📍 Using provided session')
       }
       
-      console.log('📍 STEP 1 COMPLETE: Session ready')
       console.log('🔐 Current session exists:', !!session)
       console.log('🔐 Session user ID:', session?.user?.id)
       console.log('🔐 Session access token exists:', !!session?.access_token)
       
-      // 🔧 NEW: Verify user actually exists in Supabase auth
-      console.log('📍 STEP 1.5: Verifying user exists in Supabase auth...')
+      console.log('⏱️ Executing main query...')
       
-      // 🔧 PRODUCTION OPTIMIZATION: Only call getUser() if we don't have session from getSession()
-      if (!session) {
-        console.log('📍 STEP 1.5a: No session available, need to verify with getUser()...')
-        try {
-          // 🔧 Reduced timeout for production performance (2s instead of 5s)
-          const getUserPromise = supabase.auth.getUser()
-          const getUserTimeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('User verification timeout')), 2000)
-          )
-          
-          const { data: { user }, error: userError } = await Promise.race([getUserPromise, getUserTimeoutPromise])
-          
-          console.log('📍 STEP 1.5a COMPLETE: User verification done')
-          
-          if (userError || !user) {
-            console.log('🚨 DETECTED: User session is invalid or user was deleted')
-            console.log('🚨 User error:', userError?.message || 'User not found')
-            console.log('🔧 SOLUTION: Signing out corrupted session')
-            alert('Your account was deleted or session expired. Please sign in again.')
-            await supabase.auth.signOut()
-            setLoading(false)
-            return
-          }
-          
-          console.log('✅ User verification passed:', user.email)
-        } catch (verifyError) {
-          console.log('🚨 DETECTED: User verification failed or timed out')
-          console.log('🚨 Verification error:', verifyError)
-          
-          // Handle timeout specifically
-          if (verifyError instanceof Error && verifyError.message === 'User verification timeout') {
-            console.log('⏰ User verification timed out, but continuing with profile fetch...')
-            console.log('📍 STEP 1.5 TIMEOUT: Proceeding despite user verification timeout')
-          } else {
-            console.log('🔧 SOLUTION: Signing out corrupted session')
-            alert('Your session is corrupted. Please sign in again.')
-            await supabase.auth.signOut()
-            setLoading(false)
-            return
-          }
-        }
-      } else {
-        console.log('📍 STEP 1.5: Skipping getUser() - already have valid session from getSession()')
-        console.log('✅ Session verification passed via getSession():', session.user?.email)
-      }
-      
-      console.log('📍 STEP 2 COMPLETE: Network check done')
-      
-      console.log('📍 STEP 3: Starting CORS test...')
-      
-      // 🔧 CORS TEST: Try a simple connection test first
-      console.log('🧪 Testing CORS with simple query...')
-      try {
-        console.log('📍 STEP 3a: Creating CORS test query...')
-        const corsTestStart = Date.now()
-        
-        console.log('📍 STEP 3b: Executing CORS test query...')
-        
-        // 🔧 Add timeout to CORS test to prevent hanging
-        const corsTestPromise = supabase
-          .from('user_profiles')
-          .select('count')
-          .limit(1)
-        
-        const corsTimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('CORS test timeout')), 5000)
-        )
-        
-        const { data: corsTest, error: corsError } = await Promise.race([corsTestPromise, corsTimeoutPromise])
-        const corsTestEnd = Date.now()
-        
-        console.log('📍 STEP 3c: CORS test query completed')
-        console.log(`🧪 CORS test completed in ${corsTestEnd - corsTestStart}ms`)
-        console.log('🧪 CORS test data:', corsTest)
-        console.log('🧪 CORS test error:', corsError ? corsError.message : 'None')
-        console.log('🧪 CORS test success:', !corsError)
-        
-        if (corsError) {
-          console.error('🚫 CORS test failed:', JSON.stringify(corsError, null, 2))
-          console.log('📍 EXITING: CORS test failed, setting loading to false')
-          setLoading(false)
-          return
-        }
-        
-        console.log('📍 STEP 3 COMPLETE: CORS test passed')
-      } catch (corsTestError) {
-        console.error('💥 CORS test exception:', corsTestError)
-        
-        // If it's a timeout, continue anyway but log it
-        if (corsTestError instanceof Error && corsTestError.message === 'CORS test timeout') {
-          console.log('⏰ CORS test timed out, but continuing with profile fetch...')
-          console.log('📍 STEP 3 TIMEOUT: Proceeding despite CORS test timeout')
-        } else {
-          console.log('📍 EXITING: CORS test exception, setting loading to false')
-          setLoading(false)
-          return
-        }
-      }
-      
-      console.log('📍 STEP 4: Starting RLS permissions test...')
-      
-      // 🔧 RLS PERMISSIONS TEST: Test database access with different approaches
-      console.log('🔒 Testing RLS permissions...')
-      try {
-        console.log('📍 STEP 4a: RLS test 1 - table access...')
-        
-        // Test 1: Check if we can access the table at all
-        const rls1Start = Date.now()
-        
-        // 🔧 Add timeout to RLS test 1
-        const rls1Promise = supabase
-          .from('user_profiles')
-          .select('id')
-          .limit(1)
-        
-        const rls1TimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('RLS test 1 timeout')), 5000)
-        )
-        
-        const { data: rls1Data, error: rls1Error } = await Promise.race([rls1Promise, rls1TimeoutPromise])
-        const rls1End = Date.now()
-        
-        console.log('📍 STEP 4a COMPLETE: RLS test 1 done')
-        console.log(`🔒 RLS test 1 (table access) completed in ${rls1End - rls1Start}ms`)
-        console.log('🔒 RLS test 1 error:', rls1Error ? rls1Error.message : 'None')
-        console.log('🔒 RLS test 1 data count:', rls1Data ? rls1Data.length : 0)
-        
-        console.log('📍 STEP 4b: RLS test 2 - user filter...')
-        
-        // Test 2: Check if we can access our specific user ID
-        const rls2Start = Date.now()
-        
-        // 🔧 Add timeout to RLS test 2
-        const rls2Promise = supabase
-          .from('user_profiles')
-          .select('id, role')
-          .eq('id', userId)
-        
-        const rls2TimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('RLS test 2 timeout')), 5000)
-        )
-        
-        const { data: rls2Data, error: rls2Error } = await Promise.race([rls2Promise, rls2TimeoutPromise])
-        const rls2End = Date.now()
-        
-        console.log('📍 STEP 4b COMPLETE: RLS test 2 done')
-        console.log(`🔒 RLS test 2 (user filter) completed in ${rls2End - rls2Start}ms`)
-        console.log('🔒 RLS test 2 error:', rls2Error ? rls2Error.message : 'None')
-        console.log('🔒 RLS test 2 data:', rls2Data)
-        
-        console.log('📍 STEP 4c: Auth context check...')
-        
-        // Test 3: Check authentication context
-        console.log('🔒 Auth context check:', {
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          aud: session?.user?.aud,
-          appMetadata: session?.user?.app_metadata,
-          userMetadata: session?.user?.user_metadata
-        })
-        
-        console.log('📍 STEP 4c COMPLETE: Auth context logged')
-        
-        if (rls1Error && rls1Error.message !== 'RLS test 1 timeout' || 
-            rls2Error && rls2Error.message !== 'RLS test 2 timeout') {
-          console.error('🚫 RLS permission issue detected')
-          console.error('🚫 RLS error details:', {
-            tableAccess: rls1Error ? rls1Error.message : 'OK',
-            userFilter: rls2Error ? rls2Error.message : 'OK'
-          })
-          
-          // Don't exit on timeout errors, only real permission errors
-          if (rls1Error?.message !== 'RLS test 1 timeout' && rls2Error?.message !== 'RLS test 2 timeout') {
-            console.log('📍 EXITING: RLS permission issue, setting loading to false')
-            setLoading(false)
-            return
-          } else {
-            console.log('⏰ RLS tests timed out, but continuing with main query...')
-          }
-        }
-        
-        console.log('📍 STEP 4 COMPLETE: RLS tests passed')
-        
-      } catch (rlsError) {
-        console.error('💥 RLS test exception:', rlsError)
-        
-        // If it's a timeout, continue anyway but log it
-        if (rlsError instanceof Error && (rlsError.message === 'RLS test 1 timeout' || rlsError.message === 'RLS test 2 timeout')) {
-          console.log('⏰ RLS test timed out, but continuing with main query...')
-          console.log('📍 STEP 4 TIMEOUT: Proceeding despite RLS test timeout')
-        } else {
-          console.log('📍 EXITING: RLS test exception, setting loading to false')
-          setLoading(false)
-          return
-        }
-      }
-      
-      console.log('📍 STEP 5: Preparing main query...')
-      
-      // Add a timeout to the query to prevent hanging
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      // 🔧 PRODUCTION: Reduced timeout from 8s to 5s for better UX
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 5000)
-      )
-
-      console.log('📍 STEP 5 COMPLETE: Query and timeout promises created')
-      console.log('⏱️ Executing main query with timeout...')
-      
-      console.log('📍 STEP 6: Executing main query...')
-      
-      // 🔧 IMPROVED: Add more detailed logging
-      const startTime = Date.now()
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-      const endTime = Date.now()
-      
-      console.log('📍 STEP 6 COMPLETE: Main query completed')
-      console.log(`📊 Query completed in ${endTime - startTime}ms`)
+      console.log('📊 Query completed')
       console.log('📊 Query error:', error ? error.message : 'None')
-      console.log('📊 Query error code:', error ? error.code : 'None')
       console.log('📊 Query data:', data ? 'Found' : 'Not found')
 
-      console.log('📍 STEP 7: Processing query results...')
-
       if (error) {
-        console.log('📍 STEP 7a: Error detected, checking error code...')
-        
         // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
           console.log('❌ No profile found, creating new profile...')
-          console.log('📍 CALLING: createUserProfile')
           await createUserProfile(userId)
-          console.log('📍 RETURNED FROM: createUserProfile')
           return
         }
         console.error('❌ Error fetching user profile:', error)
         console.error('❌ Full error object:', JSON.stringify(error, null, 2))
         
-        // 🔧 IMPORTANT: Set loading to false even on error
-        console.log('🔧 Setting loading to false due to error')
-        console.log('📍 EXITING: Query error, setting loading to false')
         setLoading(false)
         return
       }
 
-      console.log('📍 STEP 7b: Success path - profile found')
       console.log('✅ Profile fetched successfully:', data.role)
-      
-      console.log('📍 STEP 8: Setting profile state...')
       setProfile(data)
-      console.log('📍 STEP 8 COMPLETE: Profile state set')
-      
-      console.log('📍 STEP 9: Setting loading to false...')
-      // 🔧 CRITICAL FIX: Set loading to false when profile is successfully fetched
       setLoading(false)
-      console.log('📍 STEP 9 COMPLETE: Loading set to false - SUCCESS!')
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in fetchUserProfile:', errorMessage)
-      console.log('📍 EXCEPTION: Caught in outer try-catch')
       
       // If it's a timeout, try creating a new profile
       if (errorMessage === 'Query timeout') {
         console.log('⏰ Query timed out, attempting to create new profile...')
-        console.log('📍 CALLING: createUserProfile (timeout)')
         await createUserProfile(userId)
-        console.log('📍 RETURNED FROM: createUserProfile (timeout)')
       } else {
-        // 🔧 IMPORTANT: Set loading to false on any exception
-        console.log('🔧 Setting loading to false due to exception')
-        console.log('📍 EXITING: Exception, setting loading to false')
         setLoading(false)
       }
     }
