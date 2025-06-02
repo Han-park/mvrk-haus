@@ -114,6 +114,17 @@ export default function SignUpJune() {
       if (error) {
         console.error('❌ Error creating user profile:', error)
         console.log('📍 CREATE STEP 6a: Error path - profile creation failed')
+        
+        // 🔧 NEW: Handle case where user was deleted but session still exists
+        if (error.message?.includes('foreign key') || error.message?.includes('does not exist')) {
+          console.log('🚨 DETECTED: User deleted from auth but session still exists')
+          console.log('🔧 SOLUTION: Signing out user to clear corrupted session')
+          alert('Your account data was reset. Please sign in again.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+        
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
         console.log('📍 CREATE STEP 6b: Signing out user...')
@@ -141,6 +152,16 @@ export default function SignUpJune() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
       console.log('📍 CREATE EXCEPTION: Caught in outer try-catch')
+      
+      // 🔧 NEW: Handle deleted user scenario
+      if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
+        console.log('🚨 DETECTED: User deleted but session corrupted')
+        console.log('🔧 SOLUTION: Clearing corrupted session')
+        alert('Your session is corrupted. Please sign in again.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
       
       // If profile creation fails, sign the user out
       alert('Profile creation failed. Please sign in again.')
