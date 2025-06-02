@@ -31,13 +31,36 @@ export default function SignUpJune() {
     
     try {
       console.log('📍 CREATE STEP 2: Getting user from session...')
-      // 🔧 Add timeout to getUser call in createUserProfile too
-      const getUserPromise = supabase.auth.getUser()
-      const getUserTimeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Create getUser timeout')), 5000)
-      )
+      // 🔧 PRODUCTION FIX: Try getSession() first before falling back to getUser()
+      // Based on: https://github.com/supabase/supabase/discussions/20905
+      console.log('📍 CREATE STEP 2a: Trying getSession() first for better performance...')
       
-      const { data: { user } } = await Promise.race([getUserPromise, getUserTimeoutPromise])
+      let user = null
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          user = session.user
+          console.log('📍 CREATE STEP 2a: Got user from getSession():', user.email)
+        } else {
+          console.log('📍 CREATE STEP 2a: No session from getSession(), falling back to getUser()...')
+        }
+      } catch (sessionError) {
+        console.log('📍 CREATE STEP 2a: getSession() failed, falling back to getUser():', sessionError)
+      }
+      
+      // 🔧 Only call getUser() if getSession() didn't work
+      if (!user) {
+        console.log('📍 CREATE STEP 2b: Falling back to getUser() with reduced timeout...')
+        // 🔧 Reduced timeout for production performance (2s instead of 5s)
+        const getUserPromise = supabase.auth.getUser()
+        const getUserTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Create getUser timeout')), 2000)
+        )
+        
+        const { data: { user: getUserResult } } = await Promise.race([getUserPromise, getUserTimeoutPromise])
+        user = getUserResult
+        console.log('📍 CREATE STEP 2b: Got user from getUser():', user?.email)
+      }
       
       if (!user) {
         console.error('❌ No user found in session')
@@ -202,19 +225,30 @@ export default function SignUpJune() {
       console.log('🏥 AUTH DIAGNOSTIC: Checking Supabase client state...')
       console.log('🏥 AUTH DIAGNOSTIC: Auth instance exists:', !!supabase.auth)
       
-      // Test if basic auth methods are accessible
+      // 🔧 PRODUCTION FIX: Use getSession() instead of getUser() for better performance
+      // Based on: https://github.com/supabase/supabase/discussions/20905
+      console.log('🏥 AUTH DIAGNOSTIC: Using getSession() instead of getUser() for production performance...')
       try {
-        console.log('🏥 AUTH DIAGNOSTIC: Testing auth.getSession (with timeout)...')
+        console.log('🏥 AUTH DIAGNOSTIC: Testing auth.getSession (with 2s timeout)...')
         const sessionPromise = supabase.auth.getSession()
         const sessionTimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('getSession timeout')), 3000)
+          setTimeout(() => reject(new Error('getSession timeout')), 2000)
         )
         
         const sessionResult = await Promise.race([sessionPromise, sessionTimeoutPromise])
         console.log('🏥 AUTH DIAGNOSTIC: getSession success:', !!sessionResult.data.session)
         console.log('🏥 AUTH DIAGNOSTIC: getSession error:', sessionResult.error?.message || 'None')
+        
+        // If session exists, we can proceed without getUser() call
+        if (sessionResult.data.session) {
+          console.log('✅ Using session from getSession(), skipping problematic getUser() call')
+          // Set the session as our "existing session" to skip getUser() later
+          existingSession = sessionResult.data.session
+        }
+        
       } catch (sessionError) {
         console.log('🚨 AUTH DIAGNOSTIC: getSession failed/timed out:', sessionError)
+        // Continue anyway - this is expected to be more resilient
       }
       
       console.log('📍 STEP 0 COMPLETE: Auth diagnostics done')
@@ -239,43 +273,51 @@ export default function SignUpJune() {
       
       // 🔧 NEW: Verify user actually exists in Supabase auth
       console.log('📍 STEP 1.5: Verifying user exists in Supabase auth...')
-      try {
-        // 🔧 Add timeout to user verification to prevent hanging
-        const getUserPromise = supabase.auth.getUser()
-        const getUserTimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('User verification timeout')), 5000)
-        )
-        
-        const { data: { user }, error: userError } = await Promise.race([getUserPromise, getUserTimeoutPromise])
-        
-        console.log('📍 STEP 1.5 COMPLETE: User verification done')
-        
-        if (userError || !user) {
-          console.log('🚨 DETECTED: User session is invalid or user was deleted')
-          console.log('🚨 User error:', userError?.message || 'User not found')
-          console.log('🔧 SOLUTION: Signing out corrupted session')
-          alert('Your account was deleted or session expired. Please sign in again.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
+      
+      // 🔧 PRODUCTION OPTIMIZATION: Only call getUser() if we don't have session from getSession()
+      if (!session) {
+        console.log('📍 STEP 1.5a: No session available, need to verify with getUser()...')
+        try {
+          // 🔧 Reduced timeout for production performance (2s instead of 5s)
+          const getUserPromise = supabase.auth.getUser()
+          const getUserTimeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('User verification timeout')), 2000)
+          )
+          
+          const { data: { user }, error: userError } = await Promise.race([getUserPromise, getUserTimeoutPromise])
+          
+          console.log('📍 STEP 1.5a COMPLETE: User verification done')
+          
+          if (userError || !user) {
+            console.log('🚨 DETECTED: User session is invalid or user was deleted')
+            console.log('🚨 User error:', userError?.message || 'User not found')
+            console.log('🔧 SOLUTION: Signing out corrupted session')
+            alert('Your account was deleted or session expired. Please sign in again.')
+            await supabase.auth.signOut()
+            setLoading(false)
+            return
+          }
+          
+          console.log('✅ User verification passed:', user.email)
+        } catch (verifyError) {
+          console.log('🚨 DETECTED: User verification failed or timed out')
+          console.log('🚨 Verification error:', verifyError)
+          
+          // Handle timeout specifically
+          if (verifyError instanceof Error && verifyError.message === 'User verification timeout') {
+            console.log('⏰ User verification timed out, but continuing with profile fetch...')
+            console.log('📍 STEP 1.5 TIMEOUT: Proceeding despite user verification timeout')
+          } else {
+            console.log('🔧 SOLUTION: Signing out corrupted session')
+            alert('Your session is corrupted. Please sign in again.')
+            await supabase.auth.signOut()
+            setLoading(false)
+            return
+          }
         }
-        
-        console.log('✅ User verification passed:', user.email)
-      } catch (verifyError) {
-        console.log('🚨 DETECTED: User verification failed or timed out')
-        console.log('🚨 Verification error:', verifyError)
-        
-        // Handle timeout specifically
-        if (verifyError instanceof Error && verifyError.message === 'User verification timeout') {
-          console.log('⏰ User verification timed out, but continuing with profile fetch...')
-          console.log('📍 STEP 1.5 TIMEOUT: Proceeding despite user verification timeout')
-        } else {
-          console.log('🔧 SOLUTION: Signing out corrupted session')
-          alert('Your session is corrupted. Please sign in again.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
-        }
+      } else {
+        console.log('📍 STEP 1.5: Skipping getUser() - already have valid session from getSession()')
+        console.log('✅ Session verification passed via getSession():', session.user?.email)
       }
       
       console.log('📍 STEP 2 COMPLETE: Network check done')
@@ -438,8 +480,9 @@ export default function SignUpJune() {
         .eq('id', userId)
         .single()
 
+      // 🔧 PRODUCTION: Reduced timeout from 8s to 5s for better UX
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 8000)
+        setTimeout(() => reject(new Error('Query timeout')), 5000)
       )
 
       console.log('📍 STEP 5 COMPLETE: Query and timeout promises created')
