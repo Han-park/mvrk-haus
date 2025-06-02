@@ -31,7 +31,13 @@ export default function SignUpJune() {
     
     try {
       console.log('📍 CREATE STEP 2: Getting user from session...')
-      const { data: { user } } = await supabase.auth.getUser()
+      // 🔧 Add timeout to getUser call in createUserProfile too
+      const getUserPromise = supabase.auth.getUser()
+      const getUserTimeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Create getUser timeout')), 5000)
+      )
+      
+      const { data: { user } } = await Promise.race([getUserPromise, getUserTimeoutPromise])
       
       if (!user) {
         console.error('❌ No user found in session')
@@ -153,6 +159,16 @@ export default function SignUpJune() {
       console.error('💥 Exception in createUserProfile:', errorMessage)
       console.log('📍 CREATE EXCEPTION: Caught in outer try-catch')
       
+      // 🔧 Handle timeout in createUserProfile
+      if (errorMessage === 'Create getUser timeout') {
+        console.log('⏰ CREATE: getUser timed out, this indicates auth service issues')
+        console.log('🔧 SOLUTION: Signing out to reset auth state')
+        alert('Authentication service is having issues. Please sign in again.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+      
       // 🔧 NEW: Handle deleted user scenario
       if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
         console.log('🚨 DETECTED: User deleted but session corrupted')
@@ -180,6 +196,29 @@ export default function SignUpJune() {
     console.log('🔍 Starting database query...')
     
     try {
+      console.log('📍 STEP 0: Auth service diagnostics...')
+      
+      // 🔧 NEW: Comprehensive auth service check
+      console.log('🏥 AUTH DIAGNOSTIC: Checking Supabase client state...')
+      console.log('🏥 AUTH DIAGNOSTIC: Auth instance exists:', !!supabase.auth)
+      
+      // Test if basic auth methods are accessible
+      try {
+        console.log('🏥 AUTH DIAGNOSTIC: Testing auth.getSession (with timeout)...')
+        const sessionPromise = supabase.auth.getSession()
+        const sessionTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('getSession timeout')), 3000)
+        )
+        
+        const sessionResult = await Promise.race([sessionPromise, sessionTimeoutPromise])
+        console.log('🏥 AUTH DIAGNOSTIC: getSession success:', !!sessionResult.data.session)
+        console.log('🏥 AUTH DIAGNOSTIC: getSession error:', sessionResult.error?.message || 'None')
+      } catch (sessionError) {
+        console.log('🚨 AUTH DIAGNOSTIC: getSession failed/timed out:', sessionError)
+      }
+      
+      console.log('📍 STEP 0 COMPLETE: Auth diagnostics done')
+      
       console.log('📍 STEP 1: Using provided session or getting new session...')
       
       // 🔧 FIX: Use existing session if provided, otherwise get a new one
