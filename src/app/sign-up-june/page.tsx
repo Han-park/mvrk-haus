@@ -201,7 +201,15 @@ export default function SignUpJune() {
       // 🔧 NEW: Verify user actually exists in Supabase auth
       console.log('📍 STEP 1.5: Verifying user exists in Supabase auth...')
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        // 🔧 Add timeout to user verification to prevent hanging
+        const getUserPromise = supabase.auth.getUser()
+        const getUserTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('User verification timeout')), 5000)
+        )
+        
+        const { data: { user }, error: userError } = await Promise.race([getUserPromise, getUserTimeoutPromise])
+        
+        console.log('📍 STEP 1.5 COMPLETE: User verification done')
         
         if (userError || !user) {
           console.log('🚨 DETECTED: User session is invalid or user was deleted')
@@ -215,13 +223,20 @@ export default function SignUpJune() {
         
         console.log('✅ User verification passed:', user.email)
       } catch (verifyError) {
-        console.log('🚨 DETECTED: User verification failed')
+        console.log('🚨 DETECTED: User verification failed or timed out')
         console.log('🚨 Verification error:', verifyError)
-        console.log('🔧 SOLUTION: Signing out corrupted session')
-        alert('Your session is corrupted. Please sign in again.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
+        
+        // Handle timeout specifically
+        if (verifyError instanceof Error && verifyError.message === 'User verification timeout') {
+          console.log('⏰ User verification timed out, but continuing with profile fetch...')
+          console.log('📍 STEP 1.5 TIMEOUT: Proceeding despite user verification timeout')
+        } else {
+          console.log('🔧 SOLUTION: Signing out corrupted session')
+          alert('Your session is corrupted. Please sign in again.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
       }
       
       console.log('📍 STEP 2 COMPLETE: Network check done')
