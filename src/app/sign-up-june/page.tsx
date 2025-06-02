@@ -516,26 +516,39 @@ export default function SignUpJune() {
       const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')
       
       // Use actual current origin instead of hardcoded production URL
-      const baseUrl = isLocalhost ? currentOrigin : 'https://mvrk.haus'
+      const baseUrl = isLocalhost ? currentOrigin : 'https://www.mvrk.haus'
+      const fullRedirectUrl = `${baseUrl}/auth/callback?next=/sign-up-june`
       
       debugLog('SignUpJune', 'OAuth configuration', {
         currentOrigin,
         isLocalhost,
         baseUrl,
-        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+        redirectTo: fullRedirectUrl
       })
       
       console.log('🔗 Google OAuth Debug Info:', {
         currentOrigin,
         isLocalhost,
         baseUrl,
-        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
+        fullRedirectUrl,
+        windowLocationHref: window.location.href,
+        windowLocationPathname: window.location.pathname
+      })
+      
+      // 🔧 EXTRA DEBUG: Log exactly what we're sending to Supabase
+      console.log('🚀 About to call signInWithOAuth with:', {
+        provider: 'google',
+        redirectTo: fullRedirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`,
+          redirectTo: fullRedirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
