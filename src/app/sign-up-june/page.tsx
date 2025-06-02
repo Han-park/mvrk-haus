@@ -27,76 +27,41 @@ export default function SignUpJune() {
 
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
-    console.log('📍 CREATE STEP 1: Starting createUserProfile...')
     
     try {
-      console.log('📍 CREATE STEP 2: Getting user from session...')
-      // 🔧 PRODUCTION FIX: Try getSession() first before falling back to getUser()
-      // Based on: https://github.com/supabase/supabase/discussions/20905
-      console.log('📍 CREATE STEP 2a: Trying getSession() first for better performance...')
-      
-      let user = null
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          user = session.user
-          console.log('📍 CREATE STEP 2a: Got user from getSession():', user.email)
-        } else {
-          console.log('📍 CREATE STEP 2a: No session from getSession(), falling back to getUser()...')
-        }
-      } catch (sessionError) {
-        console.log('📍 CREATE STEP 2a: getSession() failed, falling back to getUser():', sessionError)
-      }
-      
-      // 🔧 Only call getUser() if getSession() didn't work
-      if (!user) {
-        console.log('📍 CREATE STEP 2b: Falling back to getUser() with reduced timeout...')
-        // 🔧 Reduced timeout for production performance (2s instead of 5s)
-        const getUserPromise = supabase.auth.getUser()
-        const getUserTimeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Create getUser timeout')), 2000)
-        )
-        
-        const { data: { user: getUserResult } } = await Promise.race([getUserPromise, getUserTimeoutPromise])
-        user = getUserResult
-        console.log('📍 CREATE STEP 2b: Got user from getUser():', user?.email)
-      }
+      console.log('📍 Getting user from session...')
+      const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
         console.error('❌ No user found in session')
-        console.log('📍 CREATE EXITING: No user in session, setting loading to false')
         setLoading(false)
         return
       }
 
-      console.log('📍 CREATE STEP 2 COMPLETE: User found:', user.email)
-      console.log('📍 CREATE STEP 3: Checking if profile already exists for email...')
+      console.log('✅ User found:', user.email)
+      console.log('📍 Checking if profile already exists for email...')
       
-      // 🔧 NEW: Check if a profile with this email already exists
+      // Check if a profile with this email already exists
       const { data: existingProfile, error: checkError } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('email', user.email)
         .single()
 
-      console.log('📍 CREATE STEP 3 COMPLETE: Existing profile check done')
-      
       if (checkError && checkError.code !== 'PGRST116') {
         // Real error (not just "no rows found")
         console.error('❌ Error checking existing profile:', checkError)
-        console.log('📍 CREATE EXITING: Check error, setting loading to false')
         setLoading(false)
         return
       }
       
       if (existingProfile) {
         console.log('✅ Profile already exists for email:', user.email)
-        console.log('📍 CREATE STEP 4a: Using existing profile instead of creating new one')
-        console.log('📍 CREATE STEP 4a: Existing profile role:', existingProfile.role)
+        console.log('📍 Using existing profile, role:', existingProfile.role)
         
         // Update the existing profile with the current userId if needed
         if (existingProfile.id !== userId) {
-          console.log('📍 CREATE STEP 4b: Updating existing profile with new userId...')
+          console.log('📍 Updating existing profile with new userId...')
           const { data: updatedProfile, error: updateError } = await supabase
             .from('user_profiles')
             .update({ id: userId })
@@ -106,28 +71,24 @@ export default function SignUpJune() {
             
           if (updateError) {
             console.error('❌ Error updating profile userId:', updateError)
-            console.log('📍 CREATE EXITING: Update error, setting loading to false')
             setLoading(false)
             return
           }
           
-          console.log('📍 CREATE STEP 4b COMPLETE: Profile userId updated')
+          console.log('✅ Profile userId updated successfully')
           setProfile(updatedProfile)
         } else {
-          console.log('📍 CREATE STEP 4a: Profile userId already matches, using as-is')
+          console.log('✅ Profile userId already matches, using as-is')
           setProfile(existingProfile)
         }
         
-        console.log('📍 CREATE STEP 5: Setting loading to false (existing profile)...')
         setLoading(false)
-        console.log('📍 CREATE STEP 5 COMPLETE: Loading set to false - EXISTING PROFILE SUCCESS!')
         return
       }
       
-      console.log('📍 CREATE STEP 4: No existing profile found, proceeding with insert...')
+      console.log('📍 No existing profile found, creating new one...')
       console.log('📝 Creating profile for user:', user.email)
       
-      console.log('📍 CREATE STEP 5: Executing insert query...')
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -138,16 +99,13 @@ export default function SignUpJune() {
         .select()
         .single()
 
-      console.log('📍 CREATE STEP 5 COMPLETE: Insert query completed')
-
       if (error) {
         console.error('❌ Error creating user profile:', error)
-        console.log('📍 CREATE STEP 6a: Error path - profile creation failed')
         
-        // 🔧 NEW: Handle case where user was deleted but session still exists
+        // Handle case where user was deleted but session still exists
         if (error.message?.includes('foreign key') || error.message?.includes('does not exist')) {
-          console.log('🚨 DETECTED: User deleted from auth but session still exists')
-          console.log('🔧 SOLUTION: Signing out user to clear corrupted session')
+          console.log('🚨 User deleted from auth but session still exists')
+          console.log('🔧 Signing out user to clear corrupted session')
           alert('Your account data was reset. Please sign in again.')
           await supabase.auth.signOut()
           setLoading(false)
@@ -156,46 +114,23 @@ export default function SignUpJune() {
         
         // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
-        console.log('📍 CREATE STEP 6b: Signing out user...')
         await supabase.auth.signOut()
-        console.log('📍 CREATE STEP 6c: Sign out complete')
-        // 🔧 IMPORTANT: Set loading to false even when signing out
-        console.log('📍 CREATE EXITING: Error case, setting loading to false')
         setLoading(false)
         return
       }
 
-      console.log('📍 CREATE STEP 6: Success path - profile created')
       console.log('✅ Profile created successfully:', data.role)
-      
-      console.log('📍 CREATE STEP 7: Setting profile state...')
       setProfile(data)
-      console.log('📍 CREATE STEP 7 COMPLETE: Profile state set')
-      
-      console.log('📍 CREATE STEP 8: Setting loading to false...')
-      // 🔧 CRITICAL FIX: Set loading to false when profile is successfully created
       setLoading(false)
-      console.log('📍 CREATE STEP 8 COMPLETE: Loading set to false - CREATE SUCCESS!')
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
-      console.log('📍 CREATE EXCEPTION: Caught in outer try-catch')
       
-      // 🔧 Handle timeout in createUserProfile
-      if (errorMessage === 'Create getUser timeout') {
-        console.log('⏰ CREATE: getUser timed out, this indicates auth service issues')
-        console.log('🔧 SOLUTION: Signing out to reset auth state')
-        alert('Authentication service is having issues. Please sign in again.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
-      }
-      
-      // 🔧 NEW: Handle deleted user scenario
+      // Handle deleted user scenario
       if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
-        console.log('🚨 DETECTED: User deleted but session corrupted')
-        console.log('🔧 SOLUTION: Clearing corrupted session')
+        console.log('🚨 User deleted but session corrupted')
+        console.log('🔧 Clearing corrupted session')
         alert('Your session is corrupted. Please sign in again.')
         await supabase.auth.signOut()
         setLoading(false)
@@ -204,12 +139,7 @@ export default function SignUpJune() {
       
       // If profile creation fails, sign the user out
       alert('Profile creation failed. Please sign in again.')
-      console.log('📍 CREATE EXCEPTION: Signing out user...')
       await supabase.auth.signOut()
-      console.log('📍 CREATE EXCEPTION: Sign out complete')
-      
-      // 🔧 IMPORTANT: Set loading to false even when signing out
-      console.log('📍 CREATE EXITING: Exception case, setting loading to false')
       setLoading(false)
     }
   }, [])
