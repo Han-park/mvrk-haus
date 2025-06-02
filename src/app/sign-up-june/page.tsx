@@ -198,6 +198,32 @@ export default function SignUpJune() {
       console.log('🔐 Session user ID:', session?.user?.id)
       console.log('🔐 Session access token exists:', !!session?.access_token)
       
+      // 🔧 NEW: Verify user actually exists in Supabase auth
+      console.log('📍 STEP 1.5: Verifying user exists in Supabase auth...')
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !user) {
+          console.log('🚨 DETECTED: User session is invalid or user was deleted')
+          console.log('🚨 User error:', userError?.message || 'User not found')
+          console.log('🔧 SOLUTION: Signing out corrupted session')
+          alert('Your account was deleted or session expired. Please sign in again.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+        
+        console.log('✅ User verification passed:', user.email)
+      } catch (verifyError) {
+        console.log('🚨 DETECTED: User verification failed')
+        console.log('🚨 Verification error:', verifyError)
+        console.log('🔧 SOLUTION: Signing out corrupted session')
+        alert('Your session is corrupted. Please sign in again.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+      
       console.log('📍 STEP 2 COMPLETE: Network check done')
       
       console.log('📍 STEP 3: Starting CORS test...')
