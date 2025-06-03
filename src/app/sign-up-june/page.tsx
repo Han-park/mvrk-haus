@@ -646,7 +646,7 @@ export default function SignUpJune() {
         <div className="max-w-lg mx-auto">
           {user && profile ? (
             // User is signed in
-            <div className="bg-gray-50 p-8 text-center border border-gray-200">
+            <div className="bg-gray-100 p-8 text-center border border-gray-300">
               <div className="mb-6">
                 <div className="w-20 h-20 bg-gray-300 mx-auto mb-4 flex items-center justify-center overflow-hidden border border-gray-200">
                   {profile.avatar_url ? (
@@ -812,11 +812,11 @@ export default function SignUpJune() {
         <div className="text-center mt-12">
           {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
             <Link
-              href="/directory"
-              className="text-gray-600 hover:text-black transition-colors duration-200"
-            >
-              Mvrk Directory →
-            </Link>
+            href="/directory"
+            className="inline-block w-full max-w-lg mx-auto bg-black py-3 px-6 text-white font-semibold transition-colors duration-200"
+          >
+            Mvrk Directory →
+          </Link>
           ) : (
             <Link
               href="/"

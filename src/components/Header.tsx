@@ -144,14 +144,14 @@ export default function Header() {
 
             {/* Dropdown Menu */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg">
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-black shadow-lg">
                 <div className="py-1">
                   <Link
                     href="/profile/edit"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-black transition-colors"
                     onClick={() => setIsDropdownOpen(false)}
                   >
-                    Edit Profile
+                    프로필 수정
                   </Link>
                   <Link
                     href="/directory"
@@ -160,12 +160,12 @@ export default function Header() {
                   >
                     Directory
                   </Link>
-                  <hr className="border-gray-200 my-1" />
+                  <hr className="border-black my-1" />
                   <button
                     onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-black transition-colors"
                   >
-                    Sign Out
+                    로그아웃
                   </button>
                 </div>
               </div>

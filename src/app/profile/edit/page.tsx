@@ -203,9 +203,9 @@ export default function ProfileEdit() {
     setFormData(prev => {
       const isCurrentlySelected = prev.roleTagIds.includes(tagId)
       
-      // If trying to add a new tag but already have 3, don't allow it
-      if (!isCurrentlySelected && prev.roleTagIds.length >= 3) {
-        alert('You can select up to 3 role tags only.')
+      // If trying to add a new tag but already have 5, don't allow it
+      if (!isCurrentlySelected && prev.roleTagIds.length >= 5) {
+        alert('You can select up to 5 role tags only.')
         return prev
       }
       
@@ -413,7 +413,7 @@ export default function ProfileEdit() {
 
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-8">
           {/* Profile Image */}
-          <div className="bg-gray-50 p-8 border border-gray-200">
+          <div className="bg-gray-100 p-8 border border-gray-300">
             <h2 className="text-xl font-semibold text-black mb-6">Profile Image</h2>
             
             <div className="flex flex-col items-center space-y-4">
@@ -469,7 +469,7 @@ export default function ProfileEdit() {
           </div>
 
           {/* Basic Information */}
-          <div className="bg-gray-50 p-8 border border-gray-200">
+          <div className="bg-gray-100 p-8 border border-gray-300">
             <h2 className="text-xl font-semibold text-black mb-6">Basic Information</h2>
             
             <div className="space-y-6">
@@ -483,7 +483,12 @@ export default function ProfileEdit() {
                   onChange={(e) => handleInputChange('mvrkName', e.target.value)}
                   className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                   placeholder="Enter your preferred name"
+                  maxLength={20}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Max 20 characters.
+                  {formData.mvrkName && ` (${formData.mvrkName.length}/20)`}
+                </p>
               </div>
 
               <div>
@@ -496,7 +501,12 @@ export default function ProfileEdit() {
                   rows={4}
                   className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
                   placeholder="Tell others about yourself..."
+                  maxLength={100}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Max 100 characters.
+                  {formData.bio && ` (${formData.bio.length}/100)`}
+                </p>
               </div>
 
               <div>
@@ -543,17 +553,17 @@ export default function ProfileEdit() {
           </div>
 
           {/* Role Tags */}
-          <div className="bg-gray-50 p-8 border border-gray-200">
+          <div className="bg-gray-100 p-8 border border-gray-300">
             <h2 className="text-xl font-semibold text-black mb-6">Skills & Roles</h2>
             <p className="text-gray-600 text-sm mb-4">
-              Select up to 3 tags that best describe your skills and interests 
-              <span className="text-blue-600 ml-2">({formData.roleTagIds.length}/3 selected)</span>
+              Select up to 5 tags that best describe your skills and interests 
+              <span className="text-blue-600 ml-2">({formData.roleTagIds.length}/5 selected)</span>
             </p>
             
             <div className="flex flex-wrap gap-3">
               {roleTags.map(tag => {
                 const isSelected = formData.roleTagIds.includes(tag.id)
-                const isDisabled = !isSelected && formData.roleTagIds.length >= 3
+                const isDisabled = !isSelected && formData.roleTagIds.length >= 5
                 
                 return (
                   <button
@@ -577,7 +587,7 @@ export default function ProfileEdit() {
           </div>
 
           {/* OPENHAUS Questions */}
-          <div className="bg-gray-50 p-8 border border-gray-200">
+            <div className="bg-gray-100 p-8 border border-gray-300">
             <h2 className="text-xl font-semibold text-black mb-6">OPENHAUS 답변</h2>
             <p className="text-gray-600 text-sm mb-6">멤버십 최초 가입 시점에 따라 질문에 차이가 있습니다.</p>
             
@@ -643,14 +653,22 @@ export default function ProfileEdit() {
         </form>
 
         {/* Navigation */}
-        <div className="text-center mt-12">
+        {/* <div className="text-center mt-12 space-y-4">
+          <div className="max-w-lg mx-auto">
+            <a
+              href="/directory"
+              className="inline-block w-full bg-black py-3 px-6 text-white font-semibold transition-colors duration-200"
+            >
+              Mvrk Directory →
+            </a>
+          </div>
           <a
             href="/sign-up-june"
             className="text-gray-600 hover:text-black transition-colors duration-200"
           >
             ← Back to Profile
           </a>
-        </div>
+        </div> */}
       </div>
     </div>
   )

@@ -150,28 +150,28 @@ export default function SignIn() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-black">
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
-          <p className="text-gray-400">Welcome back</p>
+          <p className="text-gray-600">Welcome back</p>
         </div>
 
         {/* Main Content */}
         <div className="max-w-lg mx-auto">
           {user && profile ? (
             // User is signed in - show profile summary and navigation
-            <div className="bg-gray-900 p-8 text-center">
+            <div className="bg-gray-50 p-8 text-center border border-gray-200">
               <div className="mb-6">
-                <div className="w-20 h-20 bg-gray-600 mx-auto mb-4  flex items-center justify-center overflow-hidden">
+                <div className="w-20 h-20 bg-gray-300 mx-auto mb-4 flex items-center justify-center overflow-hidden border border-gray-200">
                   {profile.avatar_url ? (
                     <img 
                       src={profile.avatar_url} 
@@ -179,27 +179,27 @@ export default function SignIn() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-2xl font-medium">
+                    <span className="text-2xl font-medium text-gray-700">
                       {(profile.mvrkName || profile['june-ot-legalName'] || user.email)?.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-400 mb-3">{user.email}</p>
+                <p className="text-sm text-gray-600 mb-3">{user.email}</p>
                 
                 {/* Display mvrkName or legalName for members */}
                 {(profile.role === 'admin' || profile.role === 'editor' || profile.role === 'general_member' || profile.role === 'no_membership') && (
-                  <p className="text-lg text-white font-medium mb-2">
+                  <p className="text-lg text-black font-medium mb-2">
                     {profile.mvrkName || profile['june-ot-legalName'] || 'Member'}
                   </p>
                 )}
                 
                 {/* Role Information */}
                 <div className="mb-4">
-                  <div className={`inline-flex items-center px-3 py-1  text-sm font-medium ${
-                    profile.role === 'admin' ? 'bg-blue-900/30 text-blue-400 border border-blue-500/30' :
-                    profile.role === 'editor' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
-                    profile.role === 'general_member' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
-                    'bg-red-900/30 text-red-400 border border-red-500/30'
+                  <div className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
+                    profile.role === 'admin' ? 'bg-blue-100 text-blue-600 border border-blue-300' :
+                    profile.role === 'editor' ? 'bg-green-100 text-green-600 border border-green-300' :
+                    profile.role === 'general_member' ? 'bg-yellow-100 text-yellow-600 border border-yellow-300' :
+                    'bg-red-100 text-red-600 border border-red-300'
                   }`}>
                     <span className="mr-2">{ROLE_INFO[profile.role].emoji}</span>
                     {ROLE_INFO[profile.role].label}
@@ -219,7 +219,7 @@ export default function SignIn() {
                 {profile.role === 'awaiting_match' ? (
                   <Link
                     href="/sign-up-june"
-                    className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6  transition-colors duration-200"
+                    className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 transition-colors duration-200"
                   >
                     Complete Registration
                   </Link>
@@ -229,7 +229,7 @@ export default function SignIn() {
                 {profile.role !== 'awaiting_match' && (
                   <Link
                     href="/profile/edit"
-                    className="block w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6  transition-colors duration-200"
+                    className="block w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 transition-colors duration-200"
                   >
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +243,7 @@ export default function SignIn() {
                 <button
                   onClick={signOut}
                   disabled={loading}
-                  className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6  transition-colors duration-200"
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200"
                 >
                   {loading ? 'Signing out...' : 'Sign Out'}
                 </button>
@@ -251,16 +251,16 @@ export default function SignIn() {
             </div>
           ) : (
             // User is not signed in - show sign in form
-            <div className="bg-gray-900 p-8 ">
+            <div className="bg-gray-50 p-8 border border-gray-200">
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-semibold mb-2">Sign In</h3>
-                <p className="text-gray-400">Sign in to your MVRK HAUS account</p>
+                <p className="text-gray-600">Sign in to your MVRK HAUS account</p>
               </div>
 
               <button
                 onClick={signInWithGoogle}
                 disabled={signingIn || !mounted}
-                className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6  transition-colors duration-200 flex items-center justify-center space-x-3"
+                className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -286,11 +286,11 @@ export default function SignIn() {
               </button>
 
               <div className="mt-6 text-center">
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-600 text-sm">
                   Don't have an account?{' '}
                   <Link 
                     href="/sign-up-june" 
-                    className="text-blue-400 hover:text-blue-300 transition-colors"
+                    className="text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     Sign up here
                   </Link>
@@ -305,14 +305,14 @@ export default function SignIn() {
           {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
             <Link
               href="/directory"
-              className="inline-block w-full bg-gray-200 py-3 px-6 text-black font-semibold  transition-colors duration-200"
+              className="inline-block w-full bg-black py-3 px-6 text-white font-semibold transition-colors duration-200"
             >
               Mvrk Directory →
             </Link>
           ) : (
             <Link
               href="/"
-              className="text-gray-400 w-full text-white py-3 px-6 transition-colors duration-200"
+              className="text-gray-600 hover:text-black w-full py-3 px-6 transition-colors duration-200"
             >
               ← Back to Home
             </Link>

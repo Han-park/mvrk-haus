@@ -295,13 +295,22 @@ export default function UserProfilePage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-2">Member Profile</h1>
-          <p className="text-gray-600">MVRK HAUS Directory</p>
+                   {/* Last Updated */}
+                   {targetProfile.updated_at && (
+                  <p className="text-base text-gray-500 mb-4">
+                    {new Date(targetProfile.updated_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })} 업데이트됨
+                  </p>
+                )}
         </div>
 
         {/* Profile Content */}
         <div className="max-w-4xl mx-auto">
           {/* Top Section */}
-          <div className="bg-gray-50 p-8 mb-8 border border-gray-200">
+          <div className="bg-gray-100 p-8 mb-8 border border-gray-300">
             <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
               {/* Avatar */}
               <div className="flex-shrink-0">
@@ -330,6 +339,7 @@ export default function UserProfilePage() {
                 {targetProfile.bio && (
                   <p className="text-gray-700 leading-relaxed mb-2 whitespace-pre-wrap">{targetProfile.bio}</p>
                 )}
+                
 
                 {/* Role Tags */}
                 {targetProfile.roleTagIds && targetProfile.roleTagIds.length > 0 && (
@@ -340,7 +350,7 @@ export default function UserProfilePage() {
                         return tag ? (
                           <span 
                             key={tagId} 
-                            className="px-3 py-1 bg-white border border-gray-300 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+                            className="px-3 py-1 bg-white border border-gray-300 text-xs text-gray-700"
                           >
                             {tag.roleTagName}
                           </span>
@@ -371,13 +381,13 @@ export default function UserProfilePage() {
 
           {/* Question Answers Section */}
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-black mb-6">About {targetProfile.mvrkName || targetProfile['june-ot-legalName'] || 'This Member'}</h3>
+            <h3 className="text-2xl font-bold text-black mb-6">OPEN HAUS 답변</h3>
 
-            <div className="bg-gray-50 p-6 border border-gray-200">
+            <div className="bg-gray-100 p-6 border border-gray-300">
             {questionsLoading ? (
                 <p className="text-gray-600">Loading questions...</p>
             ) : answeredQuestions.length === 0 ? (
-              <div className="bg-gray-50 p-6 border border-gray-200">
+              <div className="bg-gray-100 p-6 border border-gray-300">
                 <p className="text-gray-600">No questions answered yet.</p>
               </div>
             ) : (
@@ -386,7 +396,7 @@ export default function UserProfilePage() {
                   <h4 className="text-lg font-semibold text-black mb-3">
                     {getQuestionName(questionId)}
                   </h4>
-                  <p className="text-gray-700 bg-white p-3 leading-relaxed whitespace-pre-wrap mb-6 border border-gray-200">
+                  <p className="text-gray-700 bg-white p-3 leading-relaxed whitespace-pre-wrap mb-6 border border-gray-300">
                     {getAnswerValue(questionId)}
                   </p>
                 </div>

@@ -216,12 +216,12 @@ export default function Directory() {
           {/* Header */}
           <div className="mb-12">
             <h1 className="text-4xl font-bold mb-4 text-black">Directory</h1>
-            <p className="text-gray-600">메버릭 동료들에 대해 둘러보고 협업을 요청해보세요.</p>
+            <p className="text-green-600">메버릭 동료들에 대해 알아보고 협업을 요청해보세요.</p>
           </div>
 
           {/* Role Tag Filters */}
           <div className="mb-8 bg-white border border-black p-4 text-black">
-            <h2 className="text-xl font-semibold mb-4">Filter by Role Tags</h2>
+            <h2 className="text-xl font-semibold mb-4">Filter by Tags</h2>
             <div className="flex flex-wrap gap-2">
               {roleTags.map(tag => (
                 <button
@@ -333,7 +333,7 @@ export default function Directory() {
 
             {/* Preparatory Users */}
             {filteredPreparatoryUsers.map(prepUser => (
-              <div key={`prep-${prepUser.id}`} className="bg-gray-50 p-4 border border-black">
+              <div key={`prep-${prepUser.id}`} className="bg-gray-200 p-4 border border-gray-400">
                 <div className="flex items-center mb-4">
                   <div className="w-12 h-12 bg-gray-300 flex items-center justify-center mr-3">
                     <span className="text-lg font-bold text-gray-700">
