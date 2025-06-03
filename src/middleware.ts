@@ -37,15 +37,15 @@ export async function middleware(request: NextRequest) {
 
   // Optional: Add authentication checks for protected routes
   if (request.nextUrl.pathname.startsWith('/profile') && !user) {
-    // No user, potentially respond by redirecting the user to the login page
+    // No user, redirect to sign-in page instead of sign-up
     const url = request.nextUrl.clone()
-    url.pathname = '/sign-up-june'
+    url.pathname = '/sign-in'
     return NextResponse.redirect(url)
   }
 
   if (request.nextUrl.pathname.startsWith('/directory') && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/sign-up-june'
+    url.pathname = '/sign-in'
     return NextResponse.redirect(url)
   }
 

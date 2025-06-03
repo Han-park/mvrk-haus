@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
+import Header from '@/components/Header'
+import BlobHalftoneBackground from '@/components/BlobHalftoneBackground'
 
 interface PrepUser {
   id: number
@@ -154,8 +156,8 @@ export default function Directory() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Loading...</div>
       </div>
     )
   }
@@ -163,10 +165,10 @@ export default function Directory() {
   // Redirect if not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
+          <h1 className="text-2xl text-black mb-4">Access Denied</h1>
+          <p className="text-gray-600 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
           <Link 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
@@ -181,10 +183,10 @@ export default function Directory() {
   // Redirect if no_membership
   if (profile?.role === 'no_membership') {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Access Restricted</h1>
-          <p className="text-gray-400 mb-6">디렉토리를 보기 위해서는 멤버십을 구독해야만 합니다.</p>
+          <h1 className="text-2xl text-black mb-4">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">디렉토리를 보기 위해서는 멤버십을 구독해야만 합니다.</p>
           <Link 
             href="/" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
@@ -197,170 +199,171 @@ export default function Directory() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold mb-4">MVRK HAUS Directory</h1>
-          <p className="text-gray-400">메버릭 동료들을 쉽게 찾고 협업을 요청해보세요.</p>
-        </div>
-
-        {/* Role Tag Filters */}
-        <div className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">Filter by Role Tags</h2>
-          <div className="flex flex-wrap gap-2">
-            {roleTags.map(tag => (
-              <button
-                key={tag.id}
-                onClick={() => toggleRoleTag(tag.id)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                  selectedRoleTags.includes(tag.id)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                {tag.roleTagName}
-              </button>
-            ))}
-            {selectedRoleTags.length > 0 && (
-              <button
-                onClick={() => setSelectedRoleTags([])}
-                className="px-3 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white"
-              >
-                Clear All
-              </button>
-            )}
+    <div className="min-h-screen relative">
+      {/* Blob Halftone Background */}
+      <div className="fixed inset-0 w-full h-full">
+        <BlobHalftoneBackground 
+          layerCount={3}
+          autoRefresh={false}
+          className="w-full h-full"
+        />
+      </div>
+      
+      {/* Content overlay with semi-transparent background */}
+      <div className="relative z-10 bg-white/90 backdrop-blur-sm min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-16 pt-24">
+          {/* Header */}
+          <div className="mb-12">
+            <h1 className="text-4xl font-bold mb-4 text-black">MVRK HAUS Directory</h1>
+            <p className="text-gray-600">메버릭 동료들을 쉽게 찾고 협업을 요청해보세요.</p>
           </div>
-        </div>
 
-        {/* Stats - Admin Only */}
-        {profile?.role === 'admin' && (
-          <div className="mb-8">
-            <div className="mb-4">
-              <p className="text-sm text-gray-400 italic">
-                This status dashboard is only shown to administrators for community management purposes.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-900 p-4">
-                <h3 className="text-lg font-semibold mb-2">Registered Members</h3>
-                <p className="text-2xl text-blue-400">{filteredRegisteredUsers.length}</p>
-              </div>
-              <div className="bg-gray-900 p-4">
-                <h3 className="text-lg font-semibold mb-2">Preparatory Users</h3>
-                <p className="text-2xl text-yellow-400">{filteredPreparatoryUsers.length}</p>
-              </div>
-              <div className="bg-gray-900 p-4">
-                <h3 className="text-lg font-semibold mb-2">Total</h3>
-                <p className="text-2xl text-green-400">{filteredRegisteredUsers.length + filteredPreparatoryUsers.length}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* User Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {/* Registered Users */}
-          {filteredRegisteredUsers.map(user => (
-            <Link 
-              key={user.id} 
-              href={`/directory/${user.slug || user.id}`}
-              className="bg-gray-900 p-6 border-l-4 border-green-500 hover:bg-gray-800 transition-colors duration-200 cursor-pointer block"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden mr-3">
-                  {user.avatar_url ? (
-                    <img 
-                      src={user.avatar_url} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-lg font-bold">
-                      {(user.mvrkName || user['june-ot-legalName'] || user.email)?.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white">
-                    {user.mvrkName || user['june-ot-legalName'] || 'Member'}
-                  </h3>
-                  <p className="text-sm text-gray-400">{user.instagramId ? `@${user.instagramId}` : ''}</p>
-                </div>
-              </div>
-              
-              {/* <div className="mb-3">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  user.role === 'admin' ? 'bg-blue-900/30 text-blue-400' :
-                  user.role === 'editor' ? 'bg-green-900/30 text-green-400' :
-                  user.role === 'general_member' ? 'bg-yellow-900/30 text-yellow-400' :
-                  'bg-red-900/30 text-red-400'
-                }`}>
-                  {user.role === 'general_member' ? 'member' : user.role}
-                </span>
-              </div> */}
-
-              {user.bio && (
-                <p className="text-sm text-gray-300 mb-3 line-clamp-2">{user.bio}</p>
+          {/* Role Tag Filters */}
+          <div className="mb-12">
+            <h2 className="text-xl font-semibold mb-4">Filter by Role Tags</h2>
+            <div className="flex flex-wrap gap-2">
+              {roleTags.map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => toggleRoleTag(tag.id)}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    selectedRoleTags.includes(tag.id)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  {tag.roleTagName}
+                </button>
+              ))}
+              {selectedRoleTags.length > 0 && (
+                <button
+                  onClick={() => setSelectedRoleTags([])}
+                  className="px-3 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Clear All
+                </button>
               )}
+            </div>
+          </div>
 
-              {user.roleTagIds && user.roleTagIds.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {user.roleTagIds.slice(0, 3).map(tagId => {
-                    const tag = roleTags.find(t => t.id === tagId)
-                    return tag ? (
-                      <span key={tagId} className="px-2 py-1 bg-gray-800 text-xs rounded text-gray-300">
-                        {tag.roleTagName}
+          {/* Stats - Admin Only */}
+          {profile?.role === 'admin' && (
+            <div className="mb-8 bg-red-200 p-4 border border-black">
+              <div className="mb-4">
+                <p className="text-sm text-gray-900 italic">
+                  This status dashboard is only shown to administrators for community management purposes.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 p-4 border border-gray-200">
+                  <h3 className="text-lg font-semibold mb-2">Registered Members</h3>
+                  <p className="text-2xl text-blue-600">{filteredRegisteredUsers.length}</p>
+                </div>
+                <div className="bg-gray-50 p-4 border border-gray-200">
+                  <h3 className="text-lg font-semibold mb-2">Preparatory Users</h3>
+                  <p className="text-2xl text-yellow-600">{filteredPreparatoryUsers.length}</p>
+                </div>
+                <div className="bg-gray-50 p-4 border border-gray-200">
+                  <h3 className="text-lg font-semibold mb-2">Total</h3>
+                  <p className="text-2xl text-green-600">{filteredRegisteredUsers.length + filteredPreparatoryUsers.length}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* User Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* Registered Users */}
+            {filteredRegisteredUsers.map(user => (
+              <Link 
+                key={user.id} 
+                href={`/directory/${user.slug || user.id}`}
+                className="bg-gray-50 p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer block border border-black"
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden mr-3">
+                    {user.avatar_url ? (
+                      <img 
+                        src={user.avatar_url} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-lg font-bold text-white">
+                        {(user.mvrkName || user['june-ot-legalName'] || user.email)?.charAt(0).toUpperCase()}
                       </span>
-                    ) : null
-                  })}
-                  {user.roleTagIds.length > 3 && (
-                    <span className="px-2 py-1 bg-gray-800 text-xs rounded text-gray-400">
-                      +{user.roleTagIds.length - 3} more
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-black">
+                      {user.mvrkName || user['june-ot-legalName'] || 'Member'}
+                    </h3>
+                    <p className="text-sm text-gray-600">{user.instagramId ? `@${user.instagramId}` : ''}</p>
+                  </div>
+                </div>
+
+                {user.bio && (
+                  <p className="text-sm text-gray-700 mb-3 line-clamp-2">{user.bio}</p>
+                )}
+
+                {user.roleTagIds && user.roleTagIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {user.roleTagIds.slice(0, 3).map(tagId => {
+                      const tag = roleTags.find(t => t.id === tagId)
+                      return tag ? (
+                        <span key={tagId} className="px-2 py-1 bg-gray-200 text-xs text-gray-700 border border-gray-300">
+                          {tag.roleTagName}
+                        </span>
+                      ) : null
+                    })}
+                    {user.roleTagIds.length > 3 && (
+                      <span className="px-2 py-1 bg-gray-200 text-xs rounded text-gray-600 border border-gray-300">
+                        +{user.roleTagIds.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+              </Link>
+            ))}
+
+            {/* Preparatory Users */}
+            {filteredPreparatoryUsers.map(prepUser => (
+              <div key={`prep-${prepUser.id}`} className="bg-gray-50 p-4 border border-black">
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-gray-300 flex items-center justify-center mr-3">
+                    <span className="text-lg font-bold text-gray-700">
+                      {prepUser.legalName?.charAt(0).toUpperCase()}
                     </span>
-                  )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-black">{prepUser.legalName}</h3>
+                    <p className="text-sm text-gray-600">{prepUser.kaTalkName}</p>
+                  </div>
                 </div>
-              )}
-              
-            </Link>
-          ))}
-
-          {/* Preparatory Users */}
-          {filteredPreparatoryUsers.map(prepUser => (
-            <div key={`prep-${prepUser.id}`} className="bg-gray-900 p-6 border-l-4 border-yellow-500">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-600 flex items-center justify-center mr-3">
-                  <span className="text-lg font-bold">
-                    {prepUser.legalName?.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-white">{prepUser.legalName}</h3>
-                  <p className="text-sm text-gray-400">{prepUser.kaTalkName}</p>
-                </div>
+                
+                <p className="text-sm text-gray-600">인증 대기중...</p>
               </div>
-              
-
-              <p className="text-sm text-gray-400">인증 대기중...</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {filteredRegisteredUsers.length === 0 && filteredPreparatoryUsers.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">No users found matching your criteria.</p>
+            ))}
           </div>
-        )}
 
-        {/* Back to home */}
-        <div className="text-center mt-12">
-          <Link
-            href="/"
-            className="text-gray-400 hover:text-white transition-colors duration-200"
-          >
-            ← Back to Home
-          </Link>
+          {/* Empty State */}
+          {filteredRegisteredUsers.length === 0 && filteredPreparatoryUsers.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">No users found matching your criteria.</p>
+            </div>
+          )}
+
+          {/* Back to home */}
+          <div className="text-center mt-12">
+            <Link
+              href="/"
+              className="text-gray-600 hover:text-black transition-colors duration-200"
+            >
+              ← Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     </div>

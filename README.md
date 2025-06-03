@@ -38,8 +38,20 @@ Open [http://localhost:3000](http://localhost:3000) to see the result.
 
 ### Authentication
 
-- **Sign-up page**: [http://localhost:3000/sign-up-june](http://localhost:3000/sign-up-june)
+The platform provides separate pages for new and existing users:
+
+- **Sign-up page**: [http://localhost:3000/sign-up-june](http://localhost:3000/sign-up-june) - For new users creating accounts
+- **Sign-in page**: [http://localhost:3000/sign-in](http://localhost:3000/sign-in) - For existing users logging back in
 - **Coming soon page**: [http://localhost:3000](http://localhost:3000)
+
+#### User Flow
+1. **New users** start at `/sign-up-june` to create an account and enter membership passcode
+2. **Existing users** can use `/sign-in` to quickly access their account
+3. Both pages use Google OAuth for secure authentication
+4. Users are automatically redirected based on their membership status:
+   - `awaiting_match` → Complete registration at `/sign-up-june`
+   - Active members → Directory at `/directory`
+   - Restricted access → Appropriate landing page
 
 ## 🔐 User Role System
 

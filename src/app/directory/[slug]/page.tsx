@@ -209,8 +209,8 @@ export default function UserProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Loading...</div>
       </div>
     )
   }
@@ -218,10 +218,10 @@ export default function UserProfilePage() {
   // Check authentication
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
+          <h1 className="text-2xl text-black mb-4">Access Denied</h1>
+          <p className="text-gray-600 mb-6">로그인한 메버릭 멤버만 디렉토리를 볼 수 있습니다.</p>
           <Link 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
@@ -236,10 +236,10 @@ export default function UserProfilePage() {
   // Check membership access
   if (currentProfile?.role === 'no_membership') {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Access Restricted</h1>
-          <p className="text-gray-400 mb-6">You need an active membership to view user profiles.</p>
+          <h1 className="text-2xl text-black mb-4">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">You need an active membership to view user profiles.</p>
           <Link 
             href="/" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
@@ -253,10 +253,10 @@ export default function UserProfilePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Profile Not Found</h1>
-          <p className="text-gray-400 mb-6">{error}</p>
+          <h1 className="text-2xl text-black mb-4">Profile Not Found</h1>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => router.back()}
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 mr-4"
@@ -276,8 +276,8 @@ export default function UserProfilePage() {
 
   if (!targetProfile) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">User profile not found</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">User profile not found</div>
       </div>
     )
   }
@@ -290,22 +290,22 @@ export default function UserProfilePage() {
   }) : []
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-black">
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-2">Member Profile</h1>
-          <p className="text-gray-400">MVRK HAUS Directory</p>
+          <p className="text-gray-600">MVRK HAUS Directory</p>
         </div>
 
         {/* Profile Content */}
         <div className="max-w-4xl mx-auto">
           {/* Top Section */}
-          <div className="bg-gray-900 p-8 mb-8">
+          <div className="bg-gray-50 p-8 mb-8 border border-gray-200">
             <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
               {/* Avatar */}
               <div className="flex-shrink-0">
-                <div className="w-32 h-32 bg-gray-600 flex items-center justify-center overflow-hidden">
+                <div className="w-32 h-32 bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
                   {targetProfile.avatar_url ? (
                     <img 
                       src={targetProfile.avatar_url} 
@@ -313,7 +313,7 @@ export default function UserProfilePage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-4xl font-bold">
+                    <span className="text-4xl font-bold text-gray-700">
                       {(targetProfile.mvrkName || targetProfile['june-ot-legalName'] || targetProfile.email)?.charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -322,25 +322,25 @@ export default function UserProfilePage() {
 
               {/* Profile Info */}
               <div className="flex-1 text-center md:text-left">
-                <h2 className="text-3xl font-bold text-white mb-4">
+                <h2 className="text-3xl font-bold text-black mb-4">
                   {targetProfile.mvrkName || targetProfile['june-ot-legalName'] || 'Member'}
                 </h2>
                 
                 {/* Bio */}
                 {targetProfile.bio && (
-                  <p className="text-gray-300 leading-relaxed mb-2 whitespace-pre-wrap">{targetProfile.bio}</p>
+                  <p className="text-gray-700 leading-relaxed mb-2 whitespace-pre-wrap">{targetProfile.bio}</p>
                 )}
 
                 {/* Role Tags */}
                 {targetProfile.roleTagIds && targetProfile.roleTagIds.length > 0 && (
-                  <div className="mb-6">
+                  <div className="mb-6 flex md:justify-start justify-center">
                     <div className="flex flex-wrap gap-2">
                       {targetProfile.roleTagIds.map(tagId => {
                         const tag = roleTags.find(t => t.id === tagId)
                         return tag ? (
                           <span 
                             key={tagId} 
-                            className="px-3 py-1 bg-gray-800 border border-gray-600 text-xs text-gray-300 hover:bg-gray-700 transition-colors"
+                            className="px-3 py-1 bg-white border border-gray-300 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
                           >
                             {tag.roleTagName}
                           </span>
@@ -356,11 +356,11 @@ export default function UserProfilePage() {
                     href={`https://instagram.com/${targetProfile.instagramId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-baseline space-x-1 bg-gray-300 text-black px-4 py-2 font-medium"
+                    className="inline-flex items-baseline space-x-1 bg-gray-800 text-white px-4 py-2 font-bold hover:bg-gray-900 transition-colors"
                   >
               
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="transform rotate-315">
-                      <path d="M1.20308 1.04312C1.00481 0.954998 0.772341 1.0048 0.627577 1.16641C0.482813 1.32802 0.458794 1.56455 0.568117 1.75196L3.92115 7.50002L0.568117 13.2481C0.458794 13.4355 0.482813 13.672 0.627577 13.8336C0.772341 13.9952 1.00481 14.045 1.20308 13.9569L14.7031 7.95693C14.8836 7.87668 15 7.69762 15 7.50002C15 7.30243 14.8836 7.12337 14.7031 7.04312L1.20308 1.04312ZM4.84553 7.10002L2.21234 2.586L13.2689 7.50002L2.21234 12.414L4.84552 7.90002H9C9.22092 7.90002 9.4 7.72094 9.4 7.50002C9.4 7.27911 9.22092 7.10002 9 7.10002H4.84553Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+                      <path d="M1.20308 1.04312C1.00481 0.954998 0.772341 1.0048 0.627577 1.16641C0.482813 1.32802 0.458794 1.56455 0.568117 1.75196L3.92115 7.50002L0.568117 13.2481C0.458794 13.4355 0.482813 13.672 0.627577 13.8336C0.772341 13.9952 1.00481 14.045 1.20308 13.9569L14.7031 7.95693C14.8836 7.87668 15 7.69762 15 7.50002C15 7.30243 14.8836 7.12337 14.7031 7.04312L1.20308 1.04312ZM4.84553 7.10002L2.21234 2.586L13.2689 7.50002L2.21234 12.414L4.84552 7.90002H9C9.22092 7.90002 9.4 7.72094 9.4 7.50002C9.4 7.27911 9.22092 7.10002 9 7.10002H4.84553Z" fill="currentColor" stroke="currentColor" strokeWidth="0.3" fillRule="evenodd" clipRule="evenodd"></path>
                     </svg>
                     <span>협업 요청하기</span>
                   </a>
@@ -371,28 +371,28 @@ export default function UserProfilePage() {
 
           {/* Question Answers Section */}
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-white mb-6">About {targetProfile.mvrkName || targetProfile['june-ot-legalName'] || 'This Member'}</h3>
-            
+            <h3 className="text-2xl font-bold text-black mb-6">About {targetProfile.mvrkName || targetProfile['june-ot-legalName'] || 'This Member'}</h3>
+
+            <div className="bg-gray-50 p-6 border border-gray-200">
             {questionsLoading ? (
-              <div className="bg-gray-900 p-6">
-                <p className="text-gray-400">Loading questions...</p>
-              </div>
+                <p className="text-gray-600">Loading questions...</p>
             ) : answeredQuestions.length === 0 ? (
-              <div className="bg-gray-900 p-6">
-                <p className="text-gray-400">No questions answered yet.</p>
+              <div className="bg-gray-50 p-6 border border-gray-200">
+                <p className="text-gray-600">No questions answered yet.</p>
               </div>
             ) : (
               answeredQuestions.map(questionId => (
-                <div key={questionId} className="bg-gray-900 p-6">
-                  <h4 className="text-lg font-semibold text-white mb-3">
+                <div key={questionId}>
+                  <h4 className="text-lg font-semibold text-black mb-3">
                     {getQuestionName(questionId)}
                   </h4>
-                  <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-gray-700 bg-white p-3 leading-relaxed whitespace-pre-wrap mb-6 border border-gray-200">
                     {getAnswerValue(questionId)}
                   </p>
                 </div>
               ))
             )}
+               </div>
           </div>
         </div>
 
@@ -400,14 +400,14 @@ export default function UserProfilePage() {
         <div className="text-center mt-12 space-x-4">
           <button
             onClick={() => router.back()}
-            className="text-gray-400 hover:text-white transition-colors duration-200"
+            className="text-gray-600 hover:text-black transition-colors duration-200"
           >
             ← Go Back
           </button>
-          <span className="text-gray-600">|</span>
+          <span className="text-gray-400">|</span>
           <Link
             href="/directory"
-            className="text-gray-400 hover:text-white transition-colors duration-200"
+            className="text-gray-600 hover:text-black transition-colors duration-200"
           >
             View All Members
           </Link>

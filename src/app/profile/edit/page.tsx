@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
+import Header from '@/components/Header'
 
 interface RoleTag {
   id: number
@@ -352,18 +353,18 @@ export default function ProfileEdit() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Loading...</div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">로그인한 메버릭 멤버만 프로필을 수정할 수 있습니다.</p>
+          <h1 className="text-2xl text-black mb-4">Access Denied</h1>
+          <p className="text-gray-600 mb-6">로그인한 메버릭 멤버만 프로필을 수정할 수 있습니다.</p>
           <a 
             href="/sign-up-june" 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
@@ -377,10 +378,10 @@ export default function ProfileEdit() {
 
   if (profile?.role === 'no_membership' || profile?.role === 'awaiting_match') {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-4">Profile Editing Restricted</h1>
-          <p className="text-gray-400 mb-6">Complete your membership to edit your profile.</p>
+          <h1 className="text-2xl text-black mb-4">Profile Editing Restricted</h1>
+          <p className="text-gray-600 mb-6">Complete your membership to edit your profile.</p>
           <a 
             href="/sign-up-june" 
             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2"
@@ -394,29 +395,30 @@ export default function ProfileEdit() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Profile not found</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Profile not found</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-16">
+    <div className="min-h-screen bg-white text-black">
+      <Header />
+      <div className="container mx-auto px-4 py-16 pt-24">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-2">Edit Profile</h1>
-          <p className="text-gray-400">Update your MVRK HAUS profile information</p>
+          <p className="text-gray-600">Update your MVRK HAUS profile information</p>
         </div>
 
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-8">
           {/* Profile Image */}
-          <div className="bg-gray-900 p-8">
-            <h2 className="text-xl font-semibold text-white mb-6">Profile Image</h2>
+          <div className="bg-gray-50 p-8 border border-gray-200">
+            <h2 className="text-xl font-semibold text-black mb-6">Profile Image</h2>
             
             <div className="flex flex-col items-center space-y-4">
               {/* Current Avatar Display */}
-              <div className="w-32 h-32 bg-gray-600 flex items-center justify-center overflow-hidden">
+              <div className="w-32 h-32 bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
                 {avatarPreview ? (
                   <img 
                     src={avatarPreview} 
@@ -430,7 +432,7 @@ export default function ProfileEdit() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-4xl font-medium">
+                  <span className="text-4xl font-medium text-gray-700">
                     {(formData.mvrkName || profile?.['june-ot-legalName'] || user?.email)?.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -453,7 +455,7 @@ export default function ProfileEdit() {
                   <button
                     type="button"
                     onClick={removeAvatar}
-                    className="text-red-400 hover:text-red-300 text-sm transition-colors duration-200"
+                    className="text-red-600 hover:text-red-700 text-sm transition-colors duration-200"
                   >
                     Remove Image
                   </button>
@@ -467,67 +469,67 @@ export default function ProfileEdit() {
           </div>
 
           {/* Basic Information */}
-          <div className="bg-gray-900 p-8">
-            <h2 className="text-xl font-semibold text-white mb-6">Basic Information</h2>
+          <div className="bg-gray-50 p-8 border border-gray-200">
+            <h2 className="text-xl font-semibold text-black mb-6">Basic Information</h2>
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   MVRK Name
                 </label>
                 <input
                   type="text"
                   value={formData.mvrkName}
                   onChange={(e) => handleInputChange('mvrkName', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                   placeholder="Enter your preferred name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bio
                 </label>
                 <textarea
                   value={formData.bio}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
                   placeholder="Tell others about yourself..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Instagram Username
                 </label>
                 <div className="flex">
-                  <span className="inline-flex items-center px-3 bg-gray-800 border border-r-0 border-gray-600 text-gray-400 text-sm">
+                  <span className="inline-flex items-center px-3 bg-gray-200 border border-r-0 border-gray-300 text-gray-600 text-sm">
                     @
                   </span>
                   <input
                     type="text"
                     value={formData.instagramId}
                     onChange={(e) => handleInputChange('instagramId', e.target.value)}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                    className="flex-1 px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                     placeholder="your_instagram_handle"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Profile URL Slug
                 </label>
                 <div className="flex">
-                  <span className="inline-flex items-center px-3 bg-gray-800 border border-r-0 border-gray-600 text-gray-400 text-sm">
+                  <span className="inline-flex items-center px-3 bg-gray-200 border border-r-0 border-gray-300 text-gray-600 text-sm">
                     /directory/
                   </span>
                   <input
                     type="text"
                     value={formData.slug}
                     onChange={(e) => handleSlugChange(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                    className="flex-1 px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                     placeholder="your_custom_url"
                     maxLength={20}
                   />
@@ -541,11 +543,11 @@ export default function ProfileEdit() {
           </div>
 
           {/* Role Tags */}
-          <div className="bg-gray-900 p-8">
-            <h2 className="text-xl font-semibold text-white mb-6">Skills & Roles</h2>
-            <p className="text-gray-400 text-sm mb-4">
+          <div className="bg-gray-50 p-8 border border-gray-200">
+            <h2 className="text-xl font-semibold text-black mb-6">Skills & Roles</h2>
+            <p className="text-gray-600 text-sm mb-4">
               Select up to 3 tags that best describe your skills and interests 
-              <span className="text-blue-400 ml-2">({formData.roleTagIds.length}/3 selected)</span>
+              <span className="text-blue-600 ml-2">({formData.roleTagIds.length}/3 selected)</span>
             </p>
             
             <div className="flex flex-wrap gap-3">
@@ -563,8 +565,8 @@ export default function ProfileEdit() {
                       isSelected
                         ? 'bg-blue-600 text-white border border-blue-500'
                         : isDisabled
-                        ? 'bg-gray-700 text-gray-500 border border-gray-600 cursor-not-allowed opacity-50'
-                        : 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                        ? 'bg-gray-200 text-gray-500 border border-gray-300 cursor-not-allowed opacity-50'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
                     }`}
                   >
                     {tag.roleTagName}
@@ -575,24 +577,24 @@ export default function ProfileEdit() {
           </div>
 
           {/* OPENHAUS Questions */}
-          <div className="bg-gray-900 p-8">
-            <h2 className="text-xl font-semibold text-white mb-6">OPENHAUS 답변</h2>
-            <p className="text-gray-400 text-sm mb-6">멤버십 최초 가입 시점에 따라 질문에 차이가 있습니다.</p>
+          <div className="bg-gray-50 p-8 border border-gray-200">
+            <h2 className="text-xl font-semibold text-black mb-6">OPENHAUS 답변</h2>
+            <p className="text-gray-600 text-sm mb-6">멤버십 최초 가입 시점에 따라 질문에 차이가 있습니다.</p>
             
             <div className="space-y-8">
               {/* 24년 11월 이후 신청 */}
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-2">24년 11월 이후 신청</h3>
+                <h3 className="text-lg font-semibold text-black border-b border-gray-300 pb-2">24년 11월 이후 신청</h3>
                 {['1b', '2b', '3b', '4b', '5b', '6b'].map(questionId => (
                   <div key={questionId}>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       {getQuestionName(questionId)}
                     </label>
                     <textarea
                       value={formData[questionId as keyof typeof formData] as string}
                       onChange={(e) => handleInputChange(questionId, e.target.value)}
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
+                      className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
                       placeholder="Share your thoughts..."
                     />
                   </div>
@@ -601,17 +603,17 @@ export default function ProfileEdit() {
 
               {/* 24년 10월 이전 신청 */}
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-white border-b border-gray-700 pb-2">24년 10월 이전 신청</h3>
+                <h3 className="text-lg font-semibold text-black border-b border-gray-300 pb-2">24년 10월 이전 신청</h3>
                 {['1a', '2a', '3a', '4a'].map(questionId => (
                   <div key={questionId}>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       {getQuestionName(questionId)}
                     </label>
                     <textarea
                       value={formData[questionId as keyof typeof formData] as string}
                       onChange={(e) => handleInputChange(questionId, e.target.value)}
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
+                      className="w-full px-4 py-3 bg-white border border-gray-300 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
                       placeholder="Share your thoughts..."
                     />
                   </div>
@@ -644,7 +646,7 @@ export default function ProfileEdit() {
         <div className="text-center mt-12">
           <a
             href="/sign-up-june"
-            className="text-gray-400 hover:text-white transition-colors duration-200"
+            className="text-gray-600 hover:text-black transition-colors duration-200"
           >
             ← Back to Profile
           </a>

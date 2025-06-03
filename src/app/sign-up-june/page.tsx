@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
 import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
+import Header from '@/components/Header'
 
 export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
@@ -605,24 +606,25 @@ export default function SignUpJune() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-black text-xl">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-16">
+    <div className="min-h-screen bg-white text-black">
+      {/* <Header /> */}
+      <div className="container mx-auto px-4 py-16 pt-24">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
-          <p className="text-gray-400">members only</p>
+          <p className="text-gray-600">members only</p>
           
           {/* 🐛 DEBUGGING CONTROLS - Only show in development */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="mt-6 p-4 bg-red-900/20 border border-red-500/30 rounded">
-              <h3 className="text-red-400 font-semibold mb-2">🐛 Hydration Debug Mode</h3>
+            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded">
+              <h3 className="text-red-600 font-semibold mb-2">🐛 Hydration Debug Mode</h3>
               <button
                 onClick={() => setDebugHydrationError(!debugHydrationError)}
                 className={`px-4 py-2 rounded text-sm font-medium ${
@@ -633,7 +635,7 @@ export default function SignUpJune() {
               >
                 {debugHydrationError ? '❌ Using BROKEN version (hydration errors)' : '✅ Using FIXED version (safe)'}
               </button>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-gray-600 mt-2">
                 Toggle to test hydration issues. BROKEN version will fail on desktop Chrome.
               </p>
             </div>
@@ -644,9 +646,9 @@ export default function SignUpJune() {
         <div className="max-w-lg mx-auto">
           {user && profile ? (
             // User is signed in
-            <div className="bg-gray-900 p-8 text-center">
+            <div className="bg-gray-50 p-8 text-center border border-gray-200">
               <div className="mb-6">
-                <div className="w-20 h-20 bg-gray-600 mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                <div className="w-20 h-20 bg-gray-300 mx-auto mb-4 flex items-center justify-center overflow-hidden border border-gray-200">
                   {profile.avatar_url ? (
                     <img 
                       src={profile.avatar_url} 
@@ -654,16 +656,16 @@ export default function SignUpJune() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-2xl font-medium">
+                    <span className="text-2xl font-medium text-gray-700">
                       {(profile.mvrkName || profile['june-ot-legalName'] || user.email)?.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-400 mb-3">{user.email}</p>
+                <p className="text-sm text-gray-600 mb-3">{user.email}</p>
                 
                 {/* Display mvrkName or legalName for members */}
                 {(profile.role === 'admin' || profile.role === 'editor' || profile.role === 'general_member' || profile.role === 'no_membership') && (
-                  <p className="text-lg text-white font-medium mb-2">
+                  <p className="text-lg text-black font-medium mb-2">
                     {profile.mvrkName || profile['june-ot-legalName'] || 'Member'}
                   </p>
                 )}
@@ -671,10 +673,10 @@ export default function SignUpJune() {
                 {/* Role Information */}
                 <div className="mb-4">
                   <div className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
-                    profile.role === 'admin' ? 'bg-blue-900/30 text-blue-400 border border-blue-500/30' :
-                    profile.role === 'editor' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
-                    profile.role === 'general_member' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
-                    'bg-red-900/30 text-red-400 border border-red-500/30'
+                    profile.role === 'admin' ? 'bg-blue-100 text-blue-600 border border-blue-300' :
+                    profile.role === 'editor' ? 'bg-green-100 text-green-600 border border-green-300' :
+                    profile.role === 'general_member' ? 'bg-yellow-100 text-yellow-600 border border-yellow-300' :
+                    'bg-red-100 text-red-600 border border-red-300'
                   }`}>
                     <span className="mr-2">{ROLE_INFO[profile.role].emoji}</span>
                     {ROLE_INFO[profile.role].label}
@@ -691,10 +693,10 @@ export default function SignUpJune() {
               
               <div className="space-y-4">
                 {profile.role === 'awaiting_match' && (
-                  <div className="bg-gray-800 border border-gray-600 p-6">
+                  <div className="bg-white border border-gray-300 p-6">
                     <div className="text-center mb-6">
-                      <h4 className="text-lg font-semibold text-white mb-2">Enter Passcode</h4>
-                      <p className="text-gray-400 text-sm">
+                      <h4 className="text-lg font-semibold text-black mb-2">Enter Passcode</h4>
+                      <p className="text-gray-600 text-sm">
                         카카오톡으로 전달받은 8자리 숫자를 입력하세요.
                       </p>
                     </div>
@@ -711,7 +713,7 @@ export default function SignUpJune() {
                           onChange={(e) => handlePasscodeChange(index, e.target.value)}
                           onKeyDown={(e) => handlePasscodeKeyDown(index, e)}
                           onPaste={index === 0 ? handlePasscodePaste : undefined}
-                          className="w-10 h-12 text-center text-xl font-mono bg-gray-900 border-1 border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                          className="w-10 h-12 text-center text-xl font-mono bg-white border-2 border-gray-300 rounded-lg text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                           autoComplete="off"
                           disabled={passcodeLoading}
                         />
@@ -756,16 +758,16 @@ export default function SignUpJune() {
             </div>
           ) : (
             // User is not signed in
-            <div className="bg-gray-900 p-8">
+            <div className="bg-gray-50 p-8 border border-gray-200">
               <div className="text-center mb-8">
                 <h3 className="text-xl font-semibold mb-2">Get Started</h3>
-                <p className="text-gray-400">Sign up with your Google account</p>
+                <p className="text-gray-600">Sign up with your Google account</p>
               </div>
 
               <button
                 onClick={debugHydrationError ? signInWithGoogleBROKEN : signInWithGoogle}
                 disabled={loading || !mounted}
-                className="w-full bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
+                className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -792,6 +794,15 @@ export default function SignUpJune() {
               </button>
 
               <div className="mt-6 text-center">
+                <p className="text-gray-600 text-sm">
+                  Already have an account?{' '}
+                  <Link 
+                    href="/sign-in" 
+                    className="text-blue-600 hover:text-blue-700 transition-colors"
+                  >
+                    Sign in here
+                  </Link>
+                </p>
               </div>
             </div>
           )}
@@ -802,14 +813,14 @@ export default function SignUpJune() {
           {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
             <Link
               href="/directory"
-              className="text-gray-400 hover:text-white transition-colors duration-200"
+              className="text-gray-600 hover:text-black transition-colors duration-200"
             >
               Mvrk Directory →
             </Link>
           ) : (
             <Link
               href="/"
-              className="text-gray-400 hover:text-white transition-colors duration-200"
+              className="text-gray-600 hover:text-black transition-colors duration-200"
             >
               ← Back to Home
             </Link>
