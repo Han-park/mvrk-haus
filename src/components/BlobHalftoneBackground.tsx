@@ -27,8 +27,6 @@ interface BlobLayer {
 }
 
 interface BlobHalftoneBackgroundProps {
-  width?: number;
-  height?: number;
   layerCount?: number;
   autoRefresh?: boolean;
   refreshInterval?: number;
@@ -36,8 +34,6 @@ interface BlobHalftoneBackgroundProps {
 }
 
 export default function BlobHalftoneBackground({
-  width = 1200,
-  height = 800,
   layerCount = 5,
   autoRefresh = false,
   refreshInterval = 5000,

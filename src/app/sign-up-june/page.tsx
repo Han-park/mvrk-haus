@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
 import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
-import Header from '@/components/Header'
 
 export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
@@ -614,9 +613,7 @@ export default function SignUpJune() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* <Header /> */}
       <div className="container mx-auto px-4 py-16 pt-24">
-        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
           <p className="text-gray-600">members only</p>
@@ -642,7 +639,6 @@ export default function SignUpJune() {
           )}
         </div>
 
-        {/* Main Content */}
         <div className="max-w-lg mx-auto">
           {user && profile ? (
             // User is signed in
@@ -808,7 +804,6 @@ export default function SignUpJune() {
           )}
         </div>
 
-        {/* Back to home link */}
         <div className="text-center mt-12">
           {user && profile && profile.role !== 'awaiting_match' && profile.role !== 'no_membership' ? (
             <Link

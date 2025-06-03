@@ -5,6 +5,7 @@ import BlobHalftoneCanvas from "@/components/BlobHalftoneCanvas";
 import BlobHalftoneBackground from "@/components/BlobHalftoneBackground";
 import { generateRandomBlob, BlobOptions } from "@/lib/blobGenerator";
 import Link from "next/link";
+import { parseSVG, makeAbsolute } from "svg-path-parser";
 
 export default function BlobDemo() {
   const [singleBlobPath, setSingleBlobPath] = useState(() => generateRandomBlob());
@@ -54,19 +55,18 @@ export default function BlobDemo() {
 
       try {
         // Parse and draw blob path
-        const { parseSVG, makeAbsolute } = require("svg-path-parser");
         const commands = makeAbsolute(parseSVG(blobPath));
         
         ctx.beginPath();
-        commands.forEach((cmd: any) => {
+        commands.forEach((cmd: { code: string; x?: number; y?: number; x1?: number; y1?: number; x2?: number; y2?: number }) => {
           if (cmd.code === "M") {
-            ctx.moveTo(cmd.x, cmd.y);
+            ctx.moveTo(cmd.x!, cmd.y!);
           } else if (cmd.code === "L") {
-            ctx.lineTo(cmd.x, cmd.y);
+            ctx.lineTo(cmd.x!, cmd.y!);
           } else if (cmd.code === "C") {
-            ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
+            ctx.bezierCurveTo(cmd.x1!, cmd.y1!, cmd.x2!, cmd.y2!, cmd.x!, cmd.y!);
           } else if (cmd.code === "Q") {
-            ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
+            ctx.quadraticCurveTo(cmd.x1!, cmd.y1!, cmd.x!, cmd.y!);
           } else if (cmd.code === "Z") {
             ctx.closePath();
           }
@@ -278,7 +278,7 @@ export default function BlobDemo() {
                 <div className="flex items-center justify-center h-64 text-gray-500">
                   <div className="text-center">
                     <p className="text-lg mb-2">⬅️ Create your blob first</p>
-                    <p className="text-sm">Then click "Apply Halftone" to see the effect</p>
+                    <p className="text-sm">Then click &quot;Apply Halftone&quot; to see the effect</p>
                   </div>
                 </div>
               )}
@@ -339,7 +339,7 @@ import BlobHalftoneCanvas from '@/components/BlobHalftoneCanvas';
   height={400}
   grid={8}
   maxRadius={6}
-  dotColor="#000000"
+  dotColor=&quot;#000000&quot;
 />`}
             </pre>
           </div>
