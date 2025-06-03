@@ -1,16 +1,40 @@
 {
-  "buildCommand": "npm run build",
-  "framework": "nextjs",
+  "version": 2,
   "functions": {
-    "src/app/api/**/*": {
+    "app/**/*": {
+      "runtime": "fluid"
+    },
+    "api/**/*": {
       "runtime": "fluid",
       "maxDuration": 90
     }
   },
-  "rewrites": [
+  "headers": [
+    {
+      "source": "/auth/callback",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        }
+      ]
     }
   ]
-} 
+}
