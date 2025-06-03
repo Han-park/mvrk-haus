@@ -47,8 +47,8 @@ export default function BlobHalftoneBackground({
 
   const generateLayers = () => {
     const presets = generateRandomBlobPresets();
-    const colors = ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#feca57", "#ff9ff3", "#54a0ff"];
-    const blendModes = ["multiply", "screen", "overlay", "soft-light", "color-dodge"];
+    const colors = ["#000000"]; // Black only
+    const blendModes = ["multiply"]; // Multiply only
 
     const newLayers: BlobLayer[] = [];
 
@@ -56,9 +56,9 @@ export default function BlobHalftoneBackground({
       const preset = presets[i % presets.length];
       const randomizedPreset = {
         ...preset,
-        width: preset.width! + (Math.random() - 0.5) * 200,
-        height: preset.height! + (Math.random() - 0.5) * 200,
-        randomness: 0.3 + Math.random() * 0.65,
+        width: preset.width! + (Math.random() - 0.5) * 150,
+        height: preset.height! + (Math.random() - 0.5) * 150,
+        randomness: 0.5 + Math.random() * 0.45,
       };
 
       const blobPath = generateRandomBlob(randomizedPreset);
@@ -76,11 +76,11 @@ export default function BlobHalftoneBackground({
         },
         style: {
           position: "absolute",
-          top: `${(Math.random() - 0.5) * 20}%`,
-          left: `${(Math.random() - 0.5) * 20}%`,
-          opacity: 0.4 + Math.random() * 0.4,
+          top: `${Math.random() * 80 - 10}%`,
+          left: `${Math.random() * 80 - 10}%`,
+          opacity: 0.3 + Math.random() * 0.4,
           mixBlendMode: blendMode as MixBlendMode,
-          transform: `rotate(${(Math.random() - 0.5) * 60}deg) scale(${0.8 + Math.random() * 0.4})`,
+          transform: `rotate(${(Math.random() - 0.5) * 60}deg) scale(${0.6 + Math.random() * 0.5})`,
           zIndex: 1,
         },
       };

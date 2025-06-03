@@ -293,20 +293,25 @@ export default function BlobDemo() {
             This shows how multiple blob-halftone patterns can be layered with different blend modes.
           </p>
           
+          
+
           <div className="h-96 border border-gray-200 rounded-lg overflow-hidden relative">
-            <BlobHalftoneBackground 
-              layerCount={4}
-              autoRefresh={false}
-              className="w-full h-full"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="bg-white p-4 border border-black">
                 <h3 className="font-semibold text-gray-900">Content Layer</h3>
                 <p className="text-gray-600 text-sm">
                   This content sits on top of the generated background
                 </p>
               </div>
             </div>
+
+            <BlobHalftoneBackground 
+              layerCount={4}
+              autoRefresh={false}
+              className="w-full h-full z-0"
+            />
+           
           </div>
         </div>
 

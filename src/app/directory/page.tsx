@@ -203,24 +203,24 @@ export default function Directory() {
       {/* Blob Halftone Background */}
       <div className="fixed inset-0 w-full h-full">
         <BlobHalftoneBackground 
-          layerCount={3}
+          layerCount={8}
           autoRefresh={false}
           className="w-full h-full"
         />
       </div>
       
       {/* Content overlay with semi-transparent background */}
-      <div className="relative z-10 bg-white/90 backdrop-blur-sm min-h-screen">
+      <div className="relative z-10 min-h-screen">
         <Header />
         <div className="container mx-auto px-4 py-16 pt-24">
           {/* Header */}
           <div className="mb-12">
-            <h1 className="text-4xl font-bold mb-4 text-black">MVRK HAUS Directory</h1>
-            <p className="text-gray-600">메버릭 동료들을 쉽게 찾고 협업을 요청해보세요.</p>
+            <h1 className="text-4xl font-bold mb-4 text-black">Directory</h1>
+            <p className="text-gray-600">메버릭 동료들에 대해 둘러보고 협업을 요청해보세요.</p>
           </div>
 
           {/* Role Tag Filters */}
-          <div className="mb-12">
+          <div className="mb-8 bg-white border border-black p-4 text-black">
             <h2 className="text-xl font-semibold mb-4">Filter by Role Tags</h2>
             <div className="flex flex-wrap gap-2">
               {roleTags.map(tag => (
@@ -249,10 +249,13 @@ export default function Directory() {
 
           {/* Stats - Admin Only */}
           {profile?.role === 'admin' && (
-            <div className="mb-8 bg-red-200 p-4 border border-black">
+            <div className="mb-8 bg-red-200 p-4 border border-black text-black">
               <div className="mb-4">
                 <p className="text-sm text-gray-900 italic">
-                  This status dashboard is only shown to administrators for community management purposes.
+                  This status dashboard is only shown to administrators for community management purposes. Current admin users: {(() => {
+                    const adminUsers = registeredUsers.filter(user => user.role === 'admin');
+                    return adminUsers.map(user => user.mvrkName || user['june-ot-legalName'] || 'Unnamed').join(', ');
+                  })()}
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -304,7 +307,7 @@ export default function Directory() {
                 </div>
 
                 {user.bio && (
-                  <p className="text-sm text-gray-700 mb-3 line-clamp-2">{user.bio}</p>
+                  <p className="text-sm text-black mb-3 line-clamp-2">{user.bio}</p>
                 )}
 
                 {user.roleTagIds && user.roleTagIds.length > 0 && (
@@ -312,7 +315,7 @@ export default function Directory() {
                     {user.roleTagIds.slice(0, 3).map(tagId => {
                       const tag = roleTags.find(t => t.id === tagId)
                       return tag ? (
-                        <span key={tagId} className="px-2 py-1 bg-gray-200 text-xs text-gray-700 border border-gray-300">
+                        <span key={tagId} className="px-2 py-1 bg-gray-200 text-xs text-black border border-gray-300">
                           {tag.roleTagName}
                         </span>
                       ) : null
