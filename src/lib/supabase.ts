@@ -88,4 +88,19 @@ export const createClient = () => {
 
 export const supabase = createClient()
 
+// TEMPORARY TEST: Immediately try a simple Supabase call
+console.log('[DEBUG] Attempting immediate test query in supabase.ts');
+(async () => {
+  try {
+    const { data, error } = await supabase.from('user_profiles').select('id').limit(1);
+    if (error) {
+      console.error('[DEBUG] Immediate test query ERROR in supabase.ts:', error);
+    } else {
+      console.log('[DEBUG] Immediate test query SUCCESS in supabase.ts. Data:', data);
+    }
+  } catch (catchError: any) { // Explicitly type catchError as any for this temporary debug
+    console.error('[DEBUG] Immediate test query CATCH block in supabase.ts:', catchError);
+  }
+})();
+
 export default supabase 
