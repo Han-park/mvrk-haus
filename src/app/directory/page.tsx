@@ -88,7 +88,11 @@ export default function Directory() {
       console.log('Supabase client object in fetchUserProfile:', supabase);
 
       // Get current session for the access token
+      console.log('[DEBUG] Attempting to call supabase.auth.getSession()...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('[DEBUG] supabase.auth.getSession() call completed.');
+      console.log('[DEBUG] Session object:', session);
+      console.log('[DEBUG] Session error object:', sessionError);
 
       if (sessionError) {
         console.error('Error getting session in fetchUserProfile:', sessionError);
@@ -104,6 +108,8 @@ export default function Directory() {
         return;
       }
 
+      console.log('[DEBUG] Session appears valid, proceeding to check env vars.');
+
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -113,6 +119,8 @@ export default function Directory() {
         setLoading(false);
         return;
       }
+
+      console.log('[DEBUG] Environment variables (URL/Key) appear valid.');
 
       const profileUrl = `${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}&select=*`;
       
