@@ -91,13 +91,14 @@
 
 ### Troubleshooting by Hang Point
 
-#### If Hanging at Query Execution
+#### If Hanging at Query Execution ✅ **FIXED**
 - **Symptoms**: Logs show "🏃‍♂️ Executing query..." but no "✅ Query race completed"
-- **Likely Cause**: Supabase database connection issue or RLS policy problem
-- **Solutions**:
-  - Check Supabase project status
-  - Verify RLS policies on `user_profiles` table
-  - Test manual query in Supabase dashboard
+- **Root Cause Found**: Inefficient RLS policies on `user_profiles` table
+- **Solution Applied**: Optimized RLS policies (see migration: `optimize_user_profiles_rls_policies`)
+- **Performance Issues Fixed**:
+  - ❌ **Before**: `auth.uid()` re-evaluated per row → ✅ **After**: `(select auth.uid())` cached
+  - ❌ **Before**: Multiple overlapping policies → ✅ **After**: Consolidated efficient policies
+  - ❌ **Before**: 5+ second query timeouts → ✅ **After**: Instant query execution
 
 #### If Hanging at Session Fetch  
 - **Symptoms**: Logs show "📡 About to call supabase.auth.getSession()..." but no completion
@@ -114,6 +115,30 @@
   - Check internet connection
   - Visit status.supabase.com
   - Try different network (mobile hotspot)
+
+### RLS Policy Performance Optimization
+
+#### How to Check for RLS Issues
+```sql
+-- Run in Supabase SQL Editor to check RLS policies
+SELECT 
+  policyname, cmd, roles, qual
+FROM pg_policies 
+WHERE tablename = 'user_profiles' 
+ORDER BY cmd, policyname;
+```
+
+#### Signs of RLS Performance Problems
+- [ ] Queries timeout on tables with RLS enabled
+- [ ] Performance Advisor shows "auth_rls_initplan" warnings
+- [ ] Performance Advisor shows "multiple_permissive_policies" warnings
+- [ ] Queries work fine when RLS is disabled
+
+#### RLS Optimization Best Practices
+- ✅ Use `(select auth.uid())` instead of `auth.uid()` for caching
+- ✅ Consolidate multiple policies into single efficient policies
+- ✅ Use specific roles instead of `public` when possible
+- ✅ Keep policy logic simple and indexed
 
 ### Quick Fixes
 - [ ] **Hard Refresh**: Cmd+Shift+R (clears cache)
