@@ -1,7 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 
 export const createClient = () => {
-  const isProduction = process.env.NODE_ENV === 'production'
+  // const isProduction = process.env.NODE_ENV === 'production' // Removed as it's no longer used
   // const isVercel = process.env.VERCEL === '1' // Commented out as it's no longer used
   
   // console.log('[mvrk-haus-debug] Initializing Supabase client:');
