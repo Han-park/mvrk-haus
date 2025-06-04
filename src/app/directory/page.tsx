@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { User, Session } from '@supabase/supabase-js'
+import { User, Session, Subscription } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
 import BlobHalftoneBackground from '@/components/BlobHalftoneBackground'
@@ -34,64 +34,94 @@ export default function Directory() {
   const [selectedRoleTags, setSelectedRoleTags] = useState<number[]>([])
 
   useEffect(() => {
-    console.log('[DEBUG] Main useEffect hook running...'); // This should still appear
+    console.log('[DEBUG] Main useEffect hook: START'); // 1. First log in the effect
 
-    // Get initial session and profile
     const getSessionAndProfile = async () => {
-      console.log('[DEBUG] getSessionAndProfile: Attempting to fetch initial session and profile...'); // New first log inside async fn
-      const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession()
+      console.log('[DEBUG] getSessionAndProfile: START'); // 2. Log at start of this async function
+      try {
+        const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession();
 
-      if (initialSessionError) {
-        console.error('getSessionAndProfile: Error fetching initial session:', initialSessionError);
+        if (initialSessionError) {
+          console.error('getSessionAndProfile: Error fetching initial session:', initialSessionError);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
+        if (initialSession?.user) {
+          console.log('getSessionAndProfile: Initial session received, user ID:', initialSession.user.id);
+          setUser(initialSession.user); 
+          await fetchUserProfile(initialSession); 
+        } else {
+          console.log('getSessionAndProfile: No initial session or user.');
+          setUser(null);
+          setProfile(null);
+          setLoading(false); 
+        }
+      } catch (error) {
+        // Catch any unexpected errors during getSessionAndProfile
+        console.error('getSessionAndProfile: CRITICAL UNEXPECTED ERROR:', error);
         setUser(null);
         setProfile(null);
         setLoading(false);
-        return;
       }
+      console.log('[DEBUG] getSessionAndProfile: END'); // 3. Log at end of this async function
+    };
+
+    getSessionAndProfile(); // Call the function
+
+    console.log('[DEBUG] Main useEffect hook: After getSessionAndProfile() call'); // 4. Log after sync call returns
+
+    let activeSubscription: Subscription | undefined = undefined; // Typed and initialized
+
+    try {
+      console.log('[DEBUG] Main useEffect hook: Attempting to set up onAuthStateChange listener...'); // 5. Log before setup
+      const handlerResult = supabase.auth.onAuthStateChange(
+        async (event, authChangeEventSession) => {
+          console.log('[DEBUG] onAuthStateChange: Async callback triggered. Event:', event);
+              
+          if (authChangeEventSession?.user) {
+            console.log('[DEBUG] onAuthStateChange: User found, setting user & fetching profile. User ID:', authChangeEventSession.user.id);
+            setUser(authChangeEventSession.user); 
+            await fetchUserProfile(authChangeEventSession); 
+          } else {
+            console.log('[DEBUG] onAuthStateChange: No user in session, clearing user/profile.');
+            setUser(null);
+            setProfile(null);
+          }
+              
+          if (!authChangeEventSession) {
+              console.log('[DEBUG] onAuthStateChange: No session (e.g., sign out), ensuring loading is false.');
+              setLoading(false);
+          }
+        }
+      );
       
-      if (initialSession?.user) {
-        console.log('getSessionAndProfile: Initial session received, user ID:', initialSession.user.id);
-        setUser(initialSession.user); 
-        await fetchUserProfile(initialSession); 
+      // Safely access the subscription
+      if (handlerResult && handlerResult.data && handlerResult.data.subscription) {
+        activeSubscription = handlerResult.data.subscription;
+        console.log('[DEBUG] Main useEffect hook: onAuthStateChange listener SUCCEEDED and subscription obtained.'); // 6. Success
       } else {
-        console.log('getSessionAndProfile: No initial session or user.');
-        setUser(null);
-        setProfile(null);
-        setLoading(false); 
+        console.error('[DEBUG] Main useEffect hook: onAuthStateChange listener FAILED to return expected data structure (subscription missing). Handler response:', handlerResult); // 7. Failure
       }
+    } catch (error) {
+      console.error('[DEBUG] Main useEffect hook: CRITICAL ERROR setting up onAuthStateChange listener:', error); // 8. Catch error
     }
 
-    getSessionAndProfile() // Call the async function
-
-    // Listen for auth changes
-    console.log('[DEBUG] Attempting to set up auth state change listener...');
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, authChangeEventSession) => {
-        console.log('[DEBUG] onAuthStateChange: Async callback triggered. Event:', event);
-            
-        if (authChangeEventSession?.user) {
-          console.log('[DEBUG] onAuthStateChange: User found in session, setting user and fetching profile. User ID:', authChangeEventSession.user.id);
-          setUser(authChangeEventSession.user); 
-          await fetchUserProfile(authChangeEventSession); 
-        } else {
-          console.log('[DEBUG] onAuthStateChange: No user in session, clearing user and profile.');
-          setUser(null);
-          setProfile(null);
-        }
-            
-        // If there's no session after an auth change (e.g., user signs out), ensure loading stops.
-        if (!authChangeEventSession) {
-            console.log('[DEBUG] onAuthStateChange: No session (e.g., sign out), ensuring loading is false.');
-            setLoading(false);
-        }
-      }
-    )
+    console.log('[DEBUG] Main useEffect hook: END SYNC WORK'); // 9. End of synchronous part of useEffect
 
     return () => {
-      console.log('[DEBUG] Cleaning up auth state change subscription.');
-      subscription.unsubscribe();
-    }
-  }, [])
+      console.log('[DEBUG] Main useEffect hook: Cleanup function running.'); // 10. Cleanup start
+      if (activeSubscription && typeof activeSubscription.unsubscribe === 'function') {
+        console.log('[DEBUG] Main useEffect hook: Attempting to unsubscribe.');
+        activeSubscription.unsubscribe();
+        console.log('[DEBUG] Main useEffect hook: Unsubscribe called.');
+      } else {
+        console.log('[DEBUG] Main useEffect hook: No valid subscription to unsubscribe from.');
+      }
+    };
+  }, []) // Empty dependency array means this runs once on mount and cleans up on unmount
 
   useEffect(() => {
     console.log('Profile state changed in /directory/page.tsx. Current profile:', profile);
