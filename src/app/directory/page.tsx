@@ -86,25 +86,36 @@ export default function Directory() {
     try {
       console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx');
       console.log('Supabase client object in fetchUserProfile:', supabase);
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+
+      const queryBuilder = supabase.from('user_profiles');
+      console.log('Query builder created in fetchUserProfile:', queryBuilder);
+
+      const selectedQuery = queryBuilder.select('*');
+      console.log('Query after select in fetchUserProfile:', selectedQuery);
+      
+      const filteredQuery = selectedQuery.eq('id', userId);
+      console.log('Query after eq in fetchUserProfile:', filteredQuery);
+
+      console.log('Attempting .single() for fetchUserProfile...');
+      const { data, error } = await filteredQuery.single();
 
       if (error) {
-        console.error('Error fetching user profile in /directory/page.tsx:', error);
+        console.error('Error after .single() in fetchUserProfile in /directory/page.tsx:', error);
         setProfile(null); // Explicitly set to null on error
         setLoading(false); // Ensure loading stops
-        return
+        return;
       }
 
-      console.log('Successfully fetched user profile data in /directory/page.tsx:', data);
-      setProfile(data)
+      console.log('Successfully fetched user profile data in /directory/page.tsx (after .single()):', data);
+      setProfile(data);
     } catch (error) {
       console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
       setProfile(null); // Explicitly set to null on catch
-      setLoading(false); // Ensure loading stops
+    } finally {
+      // Ensure loading is always stopped if fetchUserProfile completes, 
+      // regardless of success or caught error within the try block.
+      // This might be redundant if setLoading(false) is in all error paths, but acts as a safeguard.
+      setLoading(false);
     }
   }
 
