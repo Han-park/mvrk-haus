@@ -530,7 +530,7 @@ export default function SignUpJuneClient() {
               
               <div className="space-y-4">
                 {profile.role === 'awaiting_match' && (
-                  <div className="bg-white border border-gray-300 p-6">
+                  <div className="bg-white border border-gray-300 p-4">
                     <div className="text-center mb-6">
                       <h4 className="text-lg font-semibold text-black mb-2">Enter Passcode</h4>
                       <p className="text-gray-600 text-sm">
