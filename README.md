@@ -83,14 +83,11 @@ mvrk-haus/
 │   │   ├── api/               # API routes
 │   │   ├── auth/              # Authentication pages
 │   │   │   └── callback/      # OAuth callback handler
-│   │   ├── blob-demo/         # Blob animation demo
-│   │   ├── debug-auth/        # Authentication debugging
 │   │   ├── directory/         # Member directory
 │   │   │   └── [slug]/        # Individual member pages
 │   │   ├── hidden/            # Admin/hidden pages
 │   │   ├── profile/           # Profile management
 │   │   │   └── edit/          # Profile editing
-│   │   ├── sign-in/           # Sign-in page
 │   │   ├── sign-up-june/      # Sign-up page
 │   │   ├── layout.tsx         # Root layout
 │   │   ├── page.tsx           # Coming soon page
@@ -119,7 +116,6 @@ mvrk-haus/
 ├── tailwind.config.ts       # Tailwind CSS configuration
 ├── tsconfig.json            # TypeScript configuration
 ├── vercel.json              # Vercel deployment config
-├── SECURITY_REVIEW.md       # Security audit documentation
 ├── SUPABASE_SETUP_GUIDE.md  # Supabase setup guide
 └── README.md                # This file
 ```
@@ -843,6 +839,41 @@ A: They have the same access as non-users - only public content.
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Make sure to set up your environment variables in your deployment platform.
+
+## 🌐 Production Site
+
+### Live Domains
+
+The MVRK HAUS platform is deployed and accessible through multiple domains:
+
+- **Primary Domain**: [www.mvrk.haus](https://www.mvrk.haus) - Main production site
+- **Redirect Domain**: [mvrk.haus](https://mvrk.haus) - Redirects to www.mvrk.haus (307 redirect)
+- **Vercel Domain**: [mvrk-haus.vercel.app](https://mvrk-haus.vercel.app) - Default Vercel domain
+
+### Domain Configuration
+
+All domains are configured correctly in Vercel with the following setup:
+
+| Domain | Type | Environment | Status | Notes |
+|--------|------|-------------|--------|-------|
+| `www.mvrk.haus` | Primary | Production | ✅ Configured Correctly | Main production domain |
+| `mvrk.haus` | Redirect | Production | ✅ Configured Correctly | 307 redirect to www.mvrk.haus |
+| `mvrk-haus.vercel.app` | Default | Production | ✅ Configured Correctly | Vercel default domain |
+
+### SSL/TLS
+
+- ✅ All domains have SSL certificates automatically managed by Vercel
+- ✅ HTTPS enforcement enabled
+- ✅ HTTP to HTTPS redirects configured
+
+### Environment Variables
+
+Production environment variables are configured in Vercel dashboard:
+- `NEXT_PUBLIC_SUPABASE_URL` - Production Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Production Supabase anonymous key
+- `NODE_ENV` - Set to `production`
+
+> ⚠️ **Note**: Never commit production environment variables to version control. They are managed securely through Vercel's environment variable system.
 
 ---
 
