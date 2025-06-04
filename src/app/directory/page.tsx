@@ -87,40 +87,97 @@ export default function Directory() {
       console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx');
       console.log('Supabase client object in fetchUserProfile:', supabase);
 
-      const queryBuilder = supabase.from('user_profiles');
-      console.log('Query builder created in fetchUserProfile:', queryBuilder);
+      // Get current session for the access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      const selectedQuery = queryBuilder.select('*');
-      console.log('Query after select in fetchUserProfile:', selectedQuery);
+      if (sessionError) {
+        console.error('Error getting session in fetchUserProfile:', sessionError);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      if (!session) {
+        console.error('No active session in fetchUserProfile, cannot fetch profile.');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('Supabase URL or Anon Key is not defined in environment variables.');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const profileUrl = `${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}&select=*`;
       
-      const filteredQuery = selectedQuery.eq('id', userId);
-      console.log('Query after eq in fetchUserProfile:', filteredQuery);
+      console.log('Attempting direct fetch to:', profileUrl);
 
-      console.log('Attempting .select().limit(1) on filteredQuery for fetchUserProfile...');
-      const { data, error } = await filteredQuery.select().limit(1);
+      const response = await fetch(profileUrl, {
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (error) {
-        console.error('Error after .select().limit(1) in fetchUserProfile:', error);
-        setProfile(null); // Explicitly set to null on error
+      console.log('Direct fetch response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Error fetching user profile via direct fetch:', response.status, errorData);
+        setProfile(null);
+        setLoading(false);
+        return;
       }
 
-      if (data && data.length > 0) {
-        console.log('Successfully fetched user profile data in /directory/page.tsx (after .select().limit(1)):', data[0]);
-        setProfile(data[0]); // Assuming data is an array and we want the first item
-      } else if (data) { // data is not null, but might be empty
-        console.log('No user profile data found (empty array) after .select().limit(1).');
-        setProfile(null);
-      } else { // data is null (should be caught by error block but as a safeguard)
-        console.log('User profile data was null after .select().limit(1) and no error reported.');
+      const profiles = await response.json();
+
+      if (profiles && profiles.length > 0) {
+        console.log('Successfully fetched user profile data via direct fetch:', profiles[0]);
+        setProfile(profiles[0]);
+      } else {
+        console.log('No user profile data found via direct fetch or profiles array is empty.');
         setProfile(null);
       }
+
+      // const queryBuilder = supabase.from('user_profiles');
+      // console.log('Query builder created in fetchUserProfile:', queryBuilder);
+
+      // const selectedQuery = queryBuilder.select('*');
+      // console.log('Query after select in fetchUserProfile:', selectedQuery);
+      
+      // const filteredQuery = selectedQuery.eq('id', userId);
+      // console.log('Query after eq in fetchUserProfile:', filteredQuery);
+
+      // console.log('Attempting .select().limit(1) on filteredQuery for fetchUserProfile...');
+      // const { data, error } = await filteredQuery.select().limit(1); 
+
+      // if (error) {
+      //   console.error('Error after .select().limit(1) in fetchUserProfile:', error);
+      //   setProfile(null); 
+      //   setLoading(false); 
+      //   return;
+      // }
+
+      // if (data && data.length > 0) {
+      //   console.log('Successfully fetched user profile data in /directory/page.tsx (after .select().limit(1)):', data[0]);
+      //   setProfile(data[0]); 
+      // } else if (data) { 
+      //   console.log('No user profile data found (empty array) after .select().limit(1).');
+      //   setProfile(null);
+      // } else { 
+      //   console.log('User profile data was null after .select().limit(1) and no error reported.');
+      //   setProfile(null);
+      // }
     } catch (error) {
       console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
-      setProfile(null); // Explicitly set to null on catch
-    } finally {
-      // Ensure loading is always stopped if fetchUserProfile completes, 
-      // regardless of success or caught error within the try block.
-      // This might be redundant if setLoading(false) is in all error paths, but acts as a safeguard.
+      setProfile(null); 
       setLoading(false);
     }
   }
