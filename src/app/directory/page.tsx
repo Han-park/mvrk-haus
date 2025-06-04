@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { User } from '@supabase/supabase-js'
+import { User, Session } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
 import BlobHalftoneBackground from '@/components/BlobHalftoneBackground'
@@ -35,12 +35,24 @@ export default function Directory() {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
       console.log('Fetching initial session and profile');
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
+      const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession()
+
+      if (initialSessionError) {
+        console.error('Error fetching initial session:', initialSessionError);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
       
-      if (session?.user) {
-        await fetchUserProfile(session.user.id)
+      if (initialSession?.user) {
+        console.log('Initial session received, user ID:', initialSession.user.id);
+        setUser(initialSession.user);
+        await fetchUserProfile(initialSession);
       } else {
+        console.log('No initial session or user.');
+        setUser(null);
+        setProfile(null);
         setLoading(false); // No user, stop loading
       }
     }
@@ -50,16 +62,19 @@ export default function Directory() {
     // Listen for auth changes
     console.log('Setting up auth state change listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
+      async (event, authChangeEventSession) => {
+        console.log('Auth state changed. Event:', event, 'Session:', authChangeEventSession);
         
-        if (session?.user) {
-          await fetchUserProfile(session.user.id)
+        if (authChangeEventSession?.user) {
+          setUser(authChangeEventSession.user);
+          await fetchUserProfile(authChangeEventSession);
         } else {
-          setProfile(null)
+          setUser(null);
+          setProfile(null);
+          if (!authChangeEventSession) {
+            setLoading(false);
+          }
         }
-        
-        setLoading(false)
       }
     )
 
@@ -77,37 +92,22 @@ export default function Directory() {
       setLoading(false); // Stop loading if profile is fetched but not authorized to see directory
     } else {
       console.log('Profile is null. Not fetching directory data.');
-      // Potentially stop loading if we are sure profile won't be fetched, 
-      // but usually setLoading(false) is handled in getSessionAndProfile or fetchUserProfile errors.
     }
   }, [profile])
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (currentSession: Session | null) => {
     try {
-      console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx');
+      if (!currentSession || !currentSession.user) {
+        console.log('fetchUserProfile called with no session or no user.');
+        setProfile(null);
+        setLoading(false); // Stop loading if no session/user
+        return;
+      }
+      const userId = currentSession.user.id;
+      console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx, using provided session.');
       console.log('Supabase client object in fetchUserProfile:', supabase);
 
-      // Get current session for the access token
-      console.log('[DEBUG] Attempting to call supabase.auth.getSession()...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('[DEBUG] supabase.auth.getSession() call completed.');
-      console.log('[DEBUG] Session object:', session);
-      console.log('[DEBUG] Session error object:', sessionError);
-
-      if (sessionError) {
-        console.error('Error getting session in fetchUserProfile:', sessionError);
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
-      if (!session) {
-        console.error('No active session in fetchUserProfile, cannot fetch profile.');
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
+      console.log('[DEBUG] Using provided session. Access token exists:', !!currentSession.access_token);
       console.log('[DEBUG] Session appears valid, proceeding to check env vars.');
 
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -129,7 +129,7 @@ export default function Directory() {
       const response = await fetch(profileUrl, {
         headers: {
           'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${currentSession.access_token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -153,36 +153,6 @@ export default function Directory() {
         console.log('No user profile data found via direct fetch or profiles array is empty.');
         setProfile(null);
       }
-
-      // const queryBuilder = supabase.from('user_profiles');
-      // console.log('Query builder created in fetchUserProfile:', queryBuilder);
-
-      // const selectedQuery = queryBuilder.select('*');
-      // console.log('Query after select in fetchUserProfile:', selectedQuery);
-      
-      // const filteredQuery = selectedQuery.eq('id', userId);
-      // console.log('Query after eq in fetchUserProfile:', filteredQuery);
-
-      // console.log('Attempting .select().limit(1) on filteredQuery for fetchUserProfile...');
-      // const { data, error } = await filteredQuery.select().limit(1); 
-
-      // if (error) {
-      //   console.error('Error after .select().limit(1) in fetchUserProfile:', error);
-      //   setProfile(null); 
-      //   setLoading(false); 
-      //   return;
-      // }
-
-      // if (data && data.length > 0) {
-      //   console.log('Successfully fetched user profile data in /directory/page.tsx (after .select().limit(1)):', data[0]);
-      //   setProfile(data[0]); 
-      // } else if (data) { 
-      //   console.log('No user profile data found (empty array) after .select().limit(1).');
-      //   setProfile(null);
-      // } else { 
-      //   console.log('User profile data was null after .select().limit(1) and no error reported.');
-      //   setProfile(null);
-      // }
     } catch (error) {
       console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
       setProfile(null); 
