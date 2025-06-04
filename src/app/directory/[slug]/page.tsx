@@ -390,7 +390,7 @@ export default function UserProfilePage() {
             {questionsLoading ? (
                 <p className="text-gray-600">Loading questions...</p>
             ) : answeredQuestions.length === 0 ? (
-              <div className="bg-gray-100 p-6 border border-gray-300">
+              <div className="bg-white p-6 border border-gray-300">
                 <p className="text-gray-600">No questions answered yet.</p>
               </div>
             ) : (

@@ -39,7 +39,7 @@ if (supabaseHostname) {
   );
   remotePatternsForNextImage.push({
     protocol: 'https',
-    hostname: 'https://xuoupvqoiuyqidvcibjz.supabase.co',
+    hostname: 'xuoupvqoiuyqidvcibjz.supabase.co',
   });
 }
 

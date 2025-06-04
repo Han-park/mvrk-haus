@@ -550,7 +550,7 @@ export default function SignUpJuneClient() {
                           onChange={(e) => handlePasscodeChange(index, e.target.value)}
                           onKeyDown={(e) => handlePasscodeKeyDown(index, e)}
                           onPaste={index === 0 ? handlePasscodePaste : undefined}
-                          className="w-10 h-12 text-center text-xl font-mono bg-white border-2 border-gray-300 rounded-lg text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                          className="w-8 h-10 text-center text-xl font-mono bg-white border-2 border-gray-300 rounded-lg text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
                           autoComplete="off"
                           disabled={passcodeLoading}
                         />
