@@ -45,6 +45,7 @@ export default function ProfileEdit() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isPageRefresh, setIsPageRefresh] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -105,11 +106,16 @@ export default function ProfileEdit() {
           setProfile(null)
         }
         
+        // Always fetch these regardless of user state
+        console.log('Fetching role tags and questions...');
         await fetchRoleTags()
         await fetchQuestions()
+        console.log('Completed fetching role tags and questions.');
       } catch (error) {
         console.error('Error in getSessionAndProfile:', error)
       } finally {
+        console.log('Initial load completed, setting loading to false');
+        setIsInitialLoad(false)
         setLoading(false)
       }
     }
@@ -120,7 +126,14 @@ export default function ProfileEdit() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
-          console.log('Auth state change:', event, 'Session:', !!session);
+          console.log('Auth state change:', event, 'Session:', !!session, 'Initial load:', isInitialLoad);
+          
+          // Don't handle auth state changes during initial load
+          if (isInitialLoad) {
+            console.log('Ignoring auth state change during initial load');
+            return;
+          }
+          
           setUser(session?.user ?? null)
           
           if (session?.user) {
@@ -130,14 +143,13 @@ export default function ProfileEdit() {
           }
         } catch (error) {
           console.error('Error in auth state change:', error)
-        } finally {
-          setLoading(false)
         }
+        // Don't set loading to false here anymore - only in initial load
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isPageRefresh])
 
   useEffect(() => {
     if (profile) {
@@ -197,6 +209,8 @@ export default function ProfileEdit() {
           details: error.details,
           hint: error.hint
         });
+        // Don't return here - set profile to null and continue
+        setProfile(null)
         return
       }
 
@@ -211,6 +225,8 @@ export default function ProfileEdit() {
           stack: error.stack
         });
       }
+      // Set profile to null on error
+      setProfile(null)
     }
   }
 
