@@ -37,10 +37,7 @@ if (supabaseHostname) {
     `[next.config.ts] NEXT_PUBLIC_SUPABASE_URL is not set. ` +
     `If you use Supabase storage for images, add its hostname to images.remotePatterns.`
   );
-  remotePatternsForNextImage.push({
-    protocol: 'https',
-    hostname: 'xuoupvqoiuyqidvcibjz.supabase.co',
-  });
+  // Removed hardcoded hostname for security - add your Supabase hostname to environment variables
 }
 
 const nextConfig: NextConfig = {
