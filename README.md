@@ -1,6 +1,8 @@
 # MVRK HAUS
 
-A Next.js-powered community platform for MVRK CRAFT featuring Google OAuth authentication and role-based access control.
+A Next.js-powered community platform by MVRK CRAFT featuring Google OAuth authentication and role-based access control.
+
+- **Primary Domain**: [www.mvrk.haus](https://www.mvrk.haus) - Main production site
 
 ## 🚀 Getting Started
 
@@ -41,7 +43,6 @@ Open [http://localhost:3000](http://localhost:3000) to see the result.
 The platform provides separate pages for new and existing users:
 
 - **Sign-up page**: [http://localhost:3000/sign-up-june](http://localhost:3000/sign-up-june) - For new users creating accounts
-- **Sign-in page**: [http://localhost:3000/sign-in](http://localhost:3000/sign-in) - For existing users logging back in
 - **Coming soon page**: [http://localhost:3000](http://localhost:3000)
 
 #### User Flow
