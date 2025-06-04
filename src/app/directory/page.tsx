@@ -34,6 +34,7 @@ export default function Directory() {
   useEffect(() => {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
+      console.log('Fetching initial session and profile');
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       
@@ -47,6 +48,7 @@ export default function Directory() {
     getSessionAndProfile()
 
     // Listen for auth changes
+    console.log('Setting up auth state change listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null)
@@ -73,6 +75,7 @@ export default function Directory() {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for user ID:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -93,6 +96,7 @@ export default function Directory() {
   const fetchDirectoryData = async () => {
     try {
       // Fetch registered users (excluding no_membership)
+      console.log('Fetching registered users from user_profiles');
       const { data: users, error: usersError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -105,6 +109,7 @@ export default function Directory() {
       }
 
       // Fetch preparatory users (is_register = false)
+      console.log('Fetching preparatory users from june-otp');
       const { data: prepUsers, error: prepError } = await supabase
         .from('june-otp')
         .select('*')
@@ -122,6 +127,7 @@ export default function Directory() {
 
   const fetchRoleTags = async () => {
     try {
+      console.log('Fetching role tags from user_profile_roleTagId_enum');
       const { data, error } = await supabase
         .from('user_profile_roleTagId_enum')
         .select('*')

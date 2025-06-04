@@ -67,6 +67,7 @@ export default function ProfileEdit() {
 
   useEffect(() => {
     const getSessionAndProfile = async () => {
+      console.log('Fetching session and profile');
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       
@@ -81,6 +82,7 @@ export default function ProfileEdit() {
 
     getSessionAndProfile()
 
+    console.log('Setting up auth state change listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null)
@@ -123,6 +125,7 @@ export default function ProfileEdit() {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for user ID:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -142,6 +145,7 @@ export default function ProfileEdit() {
 
   const fetchRoleTags = async () => {
     try {
+      console.log('Fetching role tags from user_profile_roleTagId_enum');
       const { data, error } = await supabase
         .from('user_profile_roleTagId_enum')
         .select('*')
@@ -159,6 +163,7 @@ export default function ProfileEdit() {
 
   const fetchQuestions = async () => {
     try {
+      console.log('Fetching questions from openhaus_questions_enum');
       const { data, error } = await supabase
         .from('openhaus_questions_enum')
         .select('*')
@@ -260,6 +265,7 @@ export default function ProfileEdit() {
       if (formData.avatar_url) {
         const oldPath = formData.avatar_url.split('/').pop()
         if (oldPath) {
+          console.log('Removing existing avatar from storage:', oldPath);
           await supabase.storage
             .from('avatars')
             .remove([`${user.id}/${oldPath}`])
@@ -271,6 +277,7 @@ export default function ProfileEdit() {
       const fileName = `avatar-${Date.now()}.${fileExt}`
       const filePath = `${user.id}/${fileName}`
 
+      console.log('Uploading new avatar to storage:', filePath);
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, avatarFile)
@@ -280,6 +287,7 @@ export default function ProfileEdit() {
       }
 
       // Get public URL
+      console.log('Getting public URL for avatar:', filePath);
       const { data } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath)
@@ -314,6 +322,7 @@ export default function ProfileEdit() {
         }
       }
 
+      console.log('Updating user profile with data:', formData);
       const { error } = await supabase
         .from('user_profiles')
         .update({

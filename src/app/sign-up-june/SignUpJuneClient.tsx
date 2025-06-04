@@ -41,6 +41,7 @@ export default function SignUpJuneClient() {
 
   const createUserProfile = useCallback(async (userId: string) => {
     try {
+      console.log('[Supabase] supabase.auth.getUser in createUserProfile');
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
@@ -48,6 +49,7 @@ export default function SignUpJuneClient() {
         return
       }
 
+      console.log('Checking for existing profile by email:', user.email);
       const { data: existingProfile, error: checkError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -61,6 +63,7 @@ export default function SignUpJuneClient() {
       
       if (existingProfile) {
         if (existingProfile.id !== userId) {
+          console.log('[Supabase] supabase.from(\'user_profiles\').update({ id: userId }).eq(\'email\', user.email) in createUserProfile (updateError)');
           const { data: updatedProfile, error: updateError } = await supabase
             .from('user_profiles')
             .update({ id: userId })
@@ -82,6 +85,7 @@ export default function SignUpJuneClient() {
         return
       }
       
+      console.log('[Supabase] supabase.from(\'user_profiles\').insert() in createUserProfile');
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -95,12 +99,14 @@ export default function SignUpJuneClient() {
       if (error) {
         if (error.message?.includes('foreign key') || error.message?.includes('does not exist')) {
           alert('Your account data was reset. Please sign in again.')
+          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (foreign key error)');
           await supabase.auth.signOut()
           setLoading(false)
           return
         }
         
         alert('Profile creation failed. Please sign in again.')
+        console.log('[Supabase] supabase.auth.signOut() in createUserProfile (profile creation failed)');
         await supabase.auth.signOut()
         setLoading(false)
         return
@@ -114,9 +120,11 @@ export default function SignUpJuneClient() {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
           alert('Your session is corrupted. Please sign in again.')
+          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (JWT/user not found error)');
           await supabase.auth.signOut()
         } else {
           alert('Profile creation failed. Please sign in again.')
+          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (other error)');
           await supabase.auth.signOut()
         }
       } catch {
@@ -131,10 +139,12 @@ export default function SignUpJuneClient() {
     try {
       let session = existingSession
       if (!session) {
+        console.log('[Supabase] supabase.auth.getSession in fetchUserProfile');
         const { data: { session: newSession } } = await supabase.auth.getSession()
         session = newSession
       }
       
+      console.log('[Supabase] supabase.from(\'user_profiles\').select().eq(\'id\', userId) in fetchUserProfile');
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -183,11 +193,13 @@ export default function SignUpJuneClient() {
           await new Promise(resolve => setTimeout(resolve, 1000))
         }
         
+        console.log('[Supabase] supabase.auth.getSession in useEffect/getSessionAndProfile');
         const { data: { session } } = await supabase.auth.getSession()
         console.log('Initial session check:', !!session)
         
         if (session) {
           try {
+            console.log('[Supabase] supabase.auth.getUser in useEffect/getSessionAndProfile (session check)');
             await supabase.auth.getUser()
           } catch {
             // Handle auth test error silently
@@ -202,9 +214,10 @@ export default function SignUpJuneClient() {
 
     getSessionAndProfile()
 
+    console.log('[Supabase] supabase.auth.onAuthStateChange listener setup');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, !!session)
+        console.log('Auth state change event:', event, 'Session exists:', !!session);
         setUser(session?.user ?? null)
         
         const timeoutId = setTimeout(() => {
@@ -248,17 +261,19 @@ export default function SignUpJuneClient() {
       if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         baseUrl = currentOrigin
       } else if (hostname.includes('vercel.app')) {
-        baseUrl = currentOrigin
-      } else if (hostname === 'mvrk.haus') {
-        baseUrl = 'https://www.mvrk.haus'
-      } else if (hostname === 'www.mvrk.haus') {
+        baseUrl = currentOrigin // For Vercel preview and production
+      } else if (hostname === 'mvrk.haus') { // Added specific domain
+        baseUrl = 'https://www.mvrk.haus' 
+      } else if (hostname === 'www.mvrk.haus') { // Added www specific domain
         baseUrl = currentOrigin
       } else {
+        // Fallback for other environments, might need adjustment
         baseUrl = currentOrigin
       }
       
       const fullRedirectUrl = `${baseUrl}/auth/callback?next=/sign-up-june`
       
+      console.log('[Supabase] supabase.auth.signInWithOAuth (google), redirectTo:', fullRedirectUrl);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -267,31 +282,29 @@ export default function SignUpJuneClient() {
             access_type: 'offline',
             prompt: 'consent',
           },
-        }
+        },
       })
-      
+
       if (error) {
-        alert('Error signing in: ' + error.message)
+        console.error('Google Sign-In Error:', error)
+        setUrlError(`Google Sign-In Failed: ${error.message}`)
+        setLoading(false)
       }
-    } catch {
-      alert('An unexpected error occurred')
-    } finally {
+    } catch (error: any) {
+      console.error('Google Sign-In Exception:', error)
+      setUrlError(`Google Sign-In Exception: ${error.message}`)
       setLoading(false)
     }
   }
 
   const signOut = async () => {
     setLoading(true)
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        alert('Error signing out: ' + error.message)
-      }
-    } catch {
-      alert('An unexpected error occurred')
-    } finally {
-      setLoading(false)
-    }
+    console.log('[Supabase] supabase.auth.signOut()');
+    const { error } = await supabase.auth.signOut()
+    setUser(null)
+    setProfile(null)
+    setPasscode(new Array(8).fill(''))
+    setLoading(false)
   }
 
   const handlePasscodeChange = (index: number, value: string) => {
@@ -333,31 +346,38 @@ export default function SignUpJuneClient() {
   }
 
   const submitPasscode = async () => {
-    const code = passcode.join('')
-    if (code.length !== 8) {
+    if (!user) {
+      alert('User not found. Please sign in.')
+      return
+    }
+    
+    const fullPasscode = passcode.join('')
+    if (fullPasscode.length !== 8) {
       alert('Please enter all 8 digits')
       return
     }
     
     setPasscodeLoading(true)
     try {
-      const { data: otpData, error: otpError } = await supabase
+      console.log('Verifying passcode:', fullPasscode, 'for user:', user.email);
+      const { data: juneOtpEntry, error: otpError } = await supabase
         .from('june-otp')
         .select('*')
-        .eq('passcode', code)
+        .eq('passcode', fullPasscode)
         .single()
       
-      if (otpError || !otpData) {
+      if (otpError || !juneOtpEntry) {
         alert('Invalid passcode. Please check and try again.')
         setPasscodeLoading(false)
         return
       }
 
-      if (otpData.is_register && otpData.registered_user_id) {
-        const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.getUserById(otpData.registered_user_id)
+      if (juneOtpEntry.is_register && juneOtpEntry.registered_user_id) {
+        console.log('[Supabase] supabase.auth.admin.getUserById(' + juneOtpEntry.registered_user_id + ') in submitPasscode');
+        const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.getUserById(juneOtpEntry.registered_user_id)
         
         if (!authCheckError && existingAuthUser.user) {
-          if (otpData.registered_user_id !== user!.id) {
+          if (juneOtpEntry.registered_user_id !== user!.id) {
             alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
             setPasscodeLoading(false)
             return
@@ -366,18 +386,19 @@ export default function SignUpJuneClient() {
           setPasscodeLoading(false)
           return
         }
-      } else if (otpData.is_register && !otpData.registered_user_id) {
+      } else if (juneOtpEntry.is_register && !juneOtpEntry.registered_user_id) {
         alert('이 인증번호는 이미 사용되었습니다. 다른 인증번호를 사용하거나 문의해주세요.')
         setPasscodeLoading(false)
         return
       }
 
-      if (otpData.registered_user_id && otpData.registered_user_id !== user!.id) {
+      if (juneOtpEntry.registered_user_id && juneOtpEntry.registered_user_id !== user!.id) {
         alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
         setPasscodeLoading(false)
         return
       }
 
+      console.log('[Supabase] supabase.from(\'user_profiles\').select(\'role, "june-ot-legalName"\').eq(\'id\', user!.id) in submitPasscode');
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('user_profiles')
         .select('role, "june-ot-legalName"')
@@ -396,42 +417,41 @@ export default function SignUpJuneClient() {
         return
       }
 
-      const { error: updateError } = await supabase
+      // Update user_profiles table
+      console.log('Updating user profile role based on passcode for user ID:', user.id);
+      const { data: updatedProfile, error: profileError } = await supabase
         .from('user_profiles')
         .update({
           role: 'general_member',
-          'june-ot-katalkName': otpData.kaTalkName,
-          'june-ot-legalName': otpData.legalName,
-          '1a': otpData['1a'],
-          '2a': otpData['2a'],
-          '3a': otpData['3a'],
-          '4a': otpData['4a'],
-          '1b': otpData['1b'],
-          '2b': otpData['2b'],
-          '3b': otpData['3b'],
-          '4b': otpData['4b'],
-          '5b': otpData['5b'],
-          '6b': otpData['6b']
+          'june-ot-katalkName': juneOtpEntry.kaTalkName,
+          'june-ot-legalName': juneOtpEntry.legalName,
+          '1a': juneOtpEntry['1a'],
+          '2a': juneOtpEntry['2a'],
+          '3a': juneOtpEntry['3a'],
+          '4a': juneOtpEntry['4a'],
+          '1b': juneOtpEntry['1b'],
+          '2b': juneOtpEntry['2b'],
+          '3b': juneOtpEntry['3b'],
+          '4b': juneOtpEntry['4b'],
+          '5b': juneOtpEntry['5b'],
+          '6b': juneOtpEntry['6b']
         })
         .eq('id', user!.id)
 
-      if (updateError) {
+      if (profileError) {
         alert('Error updating profile. Please try again.')
         setPasscodeLoading(false)
         return
       }
 
-      const { error: otpUpdateError } = await supabase
+      // Mark passcode as used in june-otp table
+      console.log('Marking passcode as registered in june-otp for passcode:', fullPasscode);
+      const { error: updateOtpError } = await supabase
         .from('june-otp')
-        .update({ 
-          is_register: true,
-          registered_user_id: user!.id,
-          registered_email: user!.email,
-          registered_at: new Date().toISOString()
-        })
-        .eq('passcode', code)
+        .update({ is_register: true, user_id: user.id })
+        .eq('passcode', fullPasscode)
 
-      if (otpUpdateError) {
+      if (updateOtpError) {
         alert('Profile updated successfully, but there was an issue updating the passcode status. Please contact support if you encounter any issues.')
       }
 

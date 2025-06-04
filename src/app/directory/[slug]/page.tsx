@@ -49,6 +49,7 @@ export default function UserProfilePage() {
 
   const fetchCurrentUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching current user profile for user ID:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -72,6 +73,7 @@ export default function UserProfilePage() {
       setError(null)
 
       // First try to find by slug
+      console.log('Fetching target profile by slug:', slug);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -80,6 +82,7 @@ export default function UserProfilePage() {
 
       // If no result found by slug, try by ID as fallback
       if (error && error.code === 'PGRST116') {
+        console.log('Fetching target profile by ID as fallback:', slug);
         const { data: idData, error: idError } = await supabase
           .from('user_profiles')
           .select('*')
@@ -119,6 +122,7 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     const getSessionAndProfile = async () => {
+      console.log('Fetching session and profile');
       const { data: { session } } = await supabase.auth.getSession()
       setCurrentUser(session?.user ?? null)
       
@@ -137,6 +141,7 @@ export default function UserProfilePage() {
 
     getSessionAndProfile()
 
+    console.log('Setting up auth state change listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setCurrentUser(session?.user ?? null)
@@ -163,6 +168,7 @@ export default function UserProfilePage() {
   const fetchQuestions = async () => {
     try {
       setQuestionsLoading(true)
+      console.log('Fetching questions from openhaus_questions_enum');
       const { data, error } = await supabase
         .from('openhaus_questions_enum')
         .select('*')
@@ -182,6 +188,7 @@ export default function UserProfilePage() {
 
   const fetchRoleTags = async () => {
     try {
+      console.log('Fetching role tags from user_profile_roleTagId_enum');
       const { data, error } = await supabase
         .from('user_profile_roleTagId_enum')
         .select('*')
