@@ -40,9 +40,9 @@ export default function Directory() {
       
       if (session?.user) {
         await fetchUserProfile(session.user.id)
+      } else {
+        setLoading(false); // No user, stop loading
       }
-      
-      setLoading(false)
     }
 
     getSessionAndProfile()
@@ -67,9 +67,18 @@ export default function Directory() {
   }, [])
 
   useEffect(() => {
+    console.log('Profile state changed in /directory/page.tsx. Current profile:', profile);
     if (profile && profile.role !== 'no_membership') {
+      console.log('Profile is valid, fetching directory data and role tags.');
       fetchDirectoryData()
       fetchRoleTags()
+    } else if (profile) {
+      console.log('Profile exists but role is no_membership or invalid. Role:', profile.role);
+      setLoading(false); // Stop loading if profile is fetched but not authorized to see directory
+    } else {
+      console.log('Profile is null. Not fetching directory data.');
+      // Potentially stop loading if we are sure profile won't be fetched, 
+      // but usually setLoading(false) is handled in getSessionAndProfile or fetchUserProfile errors.
     }
   }, [profile])
 
@@ -83,13 +92,18 @@ export default function Directory() {
         .single()
 
       if (error) {
-        console.error('Error fetching user profile:', error)
+        console.error('Error fetching user profile in /directory/page.tsx:', error);
+        setProfile(null); // Explicitly set to null on error
+        setLoading(false); // Ensure loading stops
         return
       }
 
+      console.log('Successfully fetched user profile data in /directory/page.tsx:', data);
       setProfile(data)
     } catch (error) {
-      console.error('Error fetching user profile:', error)
+      console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
+      setProfile(null); // Explicitly set to null on catch
+      setLoading(false); // Ensure loading stops
     }
   }
 
