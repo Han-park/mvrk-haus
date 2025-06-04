@@ -899,6 +899,57 @@ export default function SignUpJune() {
     }
   }
 
+  const checkVercelHealth = async () => {
+    console.log('🏗️ VERCEL HEALTH CHECK:')
+    console.log('  Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_REGION: process.env.VERCEL_REGION
+    })
+    
+    // Test Supabase URL reachability
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const healthUrl = `${supabaseUrl}/rest/v1/`
+      
+      const start = Date.now()
+      const response = await fetch(healthUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000)
+      })
+      const duration = Date.now() - start
+      
+      console.log('  Supabase URL health:', {
+        url: healthUrl,
+        status: response.status,
+        duration: `${duration}ms`,
+        ok: response.ok
+      })
+    } catch (error) {
+      console.log('  Supabase URL health: FAILED', error instanceof Error ? error.message : 'Unknown error')
+    }
+    
+    // Test specific table access
+    try {
+      const start = Date.now()
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('count')
+        .limit(1)
+      const duration = Date.now() - start
+      
+      console.log('  Database table access:', {
+        duration: `${duration}ms`,
+        success: !error,
+        error: error?.message,
+        hasData: !!data
+      })
+    } catch (error) {
+      console.log('  Database table access: FAILED', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -918,6 +969,12 @@ export default function SignUpJune() {
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded text-sm"
               >
                 Force Reload (Dev)
+              </button>
+              <button 
+                onClick={checkVercelHealth}
+                className="mt-2 px-4 py-2 bg-green-600 text-white rounded text-sm"
+              >
+                Check Vercel Health
               </button>
             </div>
           )}
