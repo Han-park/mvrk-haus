@@ -57,6 +57,64 @@
    sessionStorage.clear()
    ```
 
+### Enhanced Debugging (v2024.2)
+
+4. **Check Detailed Query Breakdown**
+   Look for these specific log messages in order:
+   ```javascript
+   // Session Management:
+   "📡 About to call supabase.auth.getSession()..."
+   "📡 Session fetch completed in XXXms"
+   "📊 Session result: Session found"
+   
+   // Query Execution:
+   "🔧 QUERY BREAKDOWN:"
+   "📊 Building query object..."
+   "🚀 Starting query execution..."
+   "⏰ Query start time: [timestamp]"
+   "🏃‍♂️ Executing query with race condition..."
+   "✅ Query race completed"  // ← If stuck, this won't appear
+   "⏰ Query end time: [timestamp]"
+   ```
+
+5. **Identify Hanging Point**
+   - **If stuck after "🏃‍♂️ Executing query with race condition..."**: Database query is hanging
+   - **If stuck after "📡 About to call supabase.auth.getSession()..."**: Auth system is hanging
+   - **If stuck after "🌐 NETWORK HEALTH CHECK: Starting..."**: Network connectivity issues
+
+6. **Network Health Monitoring**
+   Check for these logs:
+   ```javascript
+   "🌐 Basic connectivity test: {success: true/false}"
+   "🌐 Supabase connectivity test: {success: true/false}"
+   ```
+
+### Troubleshooting by Hang Point
+
+#### If Hanging at Query Execution
+- **Symptoms**: Logs show "🏃‍♂️ Executing query..." but no "✅ Query race completed"
+- **Likely Cause**: Supabase database connection issue or RLS policy problem
+- **Solutions**:
+  - Check Supabase project status
+  - Verify RLS policies on `user_profiles` table
+  - Test manual query in Supabase dashboard
+
+#### If Hanging at Session Fetch  
+- **Symptoms**: Logs show "📡 About to call supabase.auth.getSession()..." but no completion
+- **Likely Cause**: Supabase Auth service issue or browser storage corruption
+- **Solutions**:
+  - Clear browser storage (localStorage/sessionStorage)
+  - Check Supabase Auth service status
+  - Try incognito mode
+
+#### If Network Health Check Fails
+- **Symptoms**: "🌐 Basic connectivity test failed" or "🌐 Supabase connectivity test failed"
+- **Likely Cause**: Network connectivity or Supabase service outage
+- **Solutions**:
+  - Check internet connection
+  - Visit status.supabase.com
+  - Try different network (mobile hotspot)
+
 ### Quick Fixes
 - [ ] **Hard Refresh**: Cmd+Shift+R (clears cache)
 - [ ] **Clear Storage**: DevTools → Application → Clear Storage

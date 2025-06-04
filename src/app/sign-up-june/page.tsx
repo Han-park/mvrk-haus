@@ -39,6 +39,58 @@ export default function SignUpJune() {
     }
   }, [loading])
 
+  // 🔧 NETWORK HEALTH CHECK: Test connectivity when loading starts
+  useEffect(() => {
+    if (loading && mounted) {
+      const checkNetworkHealth = async () => {
+        console.log('🌐 NETWORK HEALTH CHECK: Starting connectivity tests...')
+        
+        // Test 1: Basic fetch to a reliable endpoint
+        try {
+          const fetchStart = Date.now()
+          const response = await fetch('https://httpbin.org/get', { 
+            method: 'GET',
+            signal: AbortSignal.timeout(3000) // 3 second timeout
+          })
+          const fetchEnd = Date.now()
+          
+          console.log('🌐 Basic connectivity test:', {
+            success: response.ok,
+            status: response.status,
+            time: fetchEnd - fetchStart + 'ms'
+          })
+        } catch (error) {
+          console.log('🌐 Basic connectivity test failed:', error instanceof Error ? error.message : 'Unknown error')
+        }
+        
+        // Test 2: Supabase health check
+        try {
+          const supabaseStart = Date.now()
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('count')
+            .limit(1)
+          const supabaseEnd = Date.now()
+          
+          console.log('🌐 Supabase connectivity test:', {
+            success: !error,
+            error: error?.message,
+            time: supabaseEnd - supabaseStart + 'ms',
+            hasData: !!data
+          })
+        } catch (error) {
+          console.log('🌐 Supabase connectivity test failed:', error instanceof Error ? error.message : 'Unknown error')
+        }
+        
+        console.log('🌐 Network health check completed')
+      }
+      
+      // Run health check after a short delay to avoid interfering with main logic
+      const healthCheckTimeout = setTimeout(checkNetworkHealth, 2000)
+      return () => clearTimeout(healthCheckTimeout)
+    }
+  }, [loading, mounted])
+
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
     
@@ -184,17 +236,51 @@ export default function SignUpJune() {
       
       console.log('⏱️ Executing main query...')
       
-      const { data, error } = await supabase
+      // 🔧 DETAILED BREAKDOWN: Add step-by-step logging for the query
+      console.log('🔧 QUERY BREAKDOWN:')
+      console.log('  📊 Building query object...')
+      
+      const queryBuilder = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single()
+      
+      console.log('  📊 Query builder created successfully')
+      console.log('  📊 Target user ID:', userId)
+      console.log('  📊 Query table: user_profiles')
+      console.log('  📊 Query select: *')
+      console.log('  📊 Query filter: id =', userId)
+      
+      console.log('  🚀 Starting query execution...')
+      console.log('  ⏰ Query start time:', new Date().toISOString())
+      
+      // Add timeout wrapper around the query
+      const queryPromise = queryBuilder
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000)
+      })
+      
+      console.log('  ⏰ Query timeout set to 5 seconds')
+      console.log('  🏃‍♂️ Executing query with race condition...')
+      
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+      
+      console.log('  ✅ Query race completed')
+      console.log('  ⏰ Query end time:', new Date().toISOString())
 
       console.log('📊 Query completed')
       console.log('📊 Query error:', error ? error.message : 'None')
       console.log('📊 Query data:', data ? 'Found' : 'Not found')
-
+      
       if (error) {
+        console.log('📊 Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        
         // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
           console.log('❌ No profile found, creating new profile...')
@@ -209,16 +295,33 @@ export default function SignUpJune() {
       }
 
       console.log('✅ Profile fetched successfully:', data.role)
+      console.log('✅ Profile data preview:', {
+        id: data.id,
+        email: data.email,
+        role: data.role,
+        created_at: data.created_at
+      })
       setProfile(data)
       setLoading(false)
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in fetchUserProfile:', errorMessage)
+      console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack')
+      console.error('💥 Error type:', typeof error)
+      console.error('💥 Error constructor:', error?.constructor?.name)
       
       // If it's a timeout, try creating a new profile
-      if (errorMessage === 'Query timeout') {
-        console.log('⏰ Query timed out, attempting to create new profile...')
+      if (errorMessage === 'Query timeout after 5 seconds') {
+        console.log('⏰ Query timed out after 5 seconds, attempting to create new profile...')
+        try {
+          await createUserProfile(userId)
+        } catch (createError) {
+          console.error('💥 Failed to create profile after timeout:', createError)
+          setLoading(false)
+        }
+      } else if (errorMessage === 'Query timeout') {
+        console.log('⏰ Query timed out (general), attempting to create new profile...')
         try {
           await createUserProfile(userId)
         } catch (createError) {
@@ -226,6 +329,7 @@ export default function SignUpJune() {
           setLoading(false)
         }
       } else {
+        console.log('💥 Non-timeout error, setting loading to false')
         setLoading(false)
       }
     }
@@ -246,20 +350,55 @@ export default function SignUpJune() {
         // 🔧 FIX: Clear any potential stale session data first
         console.log('🧹 Checking for stale session data...')
         
+        console.log('📡 About to call supabase.auth.getSession()...')
+        console.log('📡 Supabase client status:', {
+          url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          clientExists: !!supabase
+        })
+        
+        const sessionStartTime = Date.now()
         const { data: { session } } = await supabase.auth.getSession()
+        const sessionEndTime = Date.now()
+        
+        console.log('📡 Session fetch completed in', sessionEndTime - sessionStartTime, 'ms')
         console.log('📊 Session result:', session ? 'Session found' : 'No session')
+        
+        if (session) {
+          console.log('📊 Session details:', {
+            userId: session.user?.id,
+            email: session.user?.email,
+            expiresAt: session.expires_at,
+            accessTokenExists: !!session.access_token,
+            refreshTokenExists: !!session.refresh_token,
+            tokenType: session.token_type
+          })
+        }
         
         // 🔧 FIX: Validate session is not expired
         if (session) {
           const now = Date.now() / 1000
           const expiresAt = session.expires_at || 0
           
+          console.log('🕒 Session expiration check:', {
+            now: now,
+            expiresAt: expiresAt,
+            isExpired: expiresAt < now,
+            timeUntilExpiry: expiresAt - now
+          })
+          
           if (expiresAt < now) {
             console.log('⚠️ Session is expired, refreshing...')
+            
+            const refreshStartTime = Date.now()
             const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+            const refreshEndTime = Date.now()
+            
+            console.log('🔄 Session refresh completed in', refreshEndTime - refreshStartTime, 'ms')
             
             if (refreshError || !refreshedSession) {
-              console.log('❌ Session refresh failed, signing out...')
+              console.log('❌ Session refresh failed:', refreshError?.message || 'No session returned')
+              console.log('🔧 Signing out due to refresh failure...')
               await supabase.auth.signOut()
               setUser(null)
               setProfile(null)
@@ -268,22 +407,32 @@ export default function SignUpJune() {
             }
             
             console.log('✅ Session refreshed successfully')
+            console.log('✅ New session details:', {
+              userId: refreshedSession.user?.id,
+              email: refreshedSession.user?.email,
+              expiresAt: refreshedSession.expires_at
+            })
             setUser(refreshedSession.user)
             
             if (refreshedSession.user) {
+              console.log('👤 Calling fetchUserProfile with refreshed session...')
               await fetchUserProfile(refreshedSession.user.id, refreshedSession)
             } else {
+              console.log('❌ No user in refreshed session, setting loading to false')
               setLoading(false)
             }
             return
           }
         }
         
+        console.log('✅ Session validation passed, proceeding with existing session')
         setUser(session?.user ?? null)
         
         if (session?.user) {
           console.log('👤 User found, fetching profile for:', session.user.id)
+          console.log('👤 About to call fetchUserProfile...')
           await fetchUserProfile(session.user.id, session)
+          console.log('👤 fetchUserProfile call completed')
         } else {
           // 🔧 FIX: Ensure loading is set to false when no session
           console.log('📊 No session found, setting loading to false')
@@ -291,10 +440,16 @@ export default function SignUpJune() {
         }
       } catch (error) {
         console.error('💥 Error in getSessionAndProfile:', error)
+        console.error('💥 Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : 'No stack',
+          type: typeof error,
+          constructor: error?.constructor?.name
+        })
         setLoading(false)
       } finally {
         clearTimeout(timeoutId)
-        console.log('✅ getSessionAndProfile completed')
+        console.log('✅ getSessionAndProfile completed, timeout cleared')
       }
     }
 
@@ -315,17 +470,24 @@ export default function SignUpJune() {
         try {
           if (session?.user) {
             console.log('👤 Auth change - fetching profile for:', session.user.id)
+            console.log('👤 Auth change - about to call fetchUserProfile...')
             await fetchUserProfile(session.user.id, session)
+            console.log('👤 Auth change - fetchUserProfile call completed')
           } else {
+            console.log('📊 Auth change - no session, clearing profile and setting loading to false')
             setProfile(null)
             setLoading(false)
           }
         } catch (error) {
           console.error('💥 Error in auth state change:', error)
+          console.error('💥 Auth change error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : 'No stack'
+          })
           setLoading(false)
         } finally {
           clearTimeout(timeoutId)
-          console.log('✅ Auth state change completed')
+          console.log('✅ Auth state change completed, timeout cleared')
         }
       }
     )
