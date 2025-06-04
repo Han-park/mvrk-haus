@@ -88,20 +88,51 @@ export const createClient = () => {
 
 export const supabase = createClient()
 
-// TEMPORARY TEST: Immediately try a simple Supabase call
-console.log('[DEBUG] Attempting immediate test query in supabase.ts');
+// TEMPORARY TEST 1: Supabase client query
+console.log('[DEBUG] Attempting Supabase client query in supabase.ts');
 (async () => {
   try {
     const { data, error } = await supabase.from('user_profiles').select('id').limit(1);
     if (error) {
-      console.error('[DEBUG] Immediate test query ERROR in supabase.ts:', error);
+      console.error('[DEBUG] Supabase client query ERROR in supabase.ts:', error);
     } else {
-      console.log('[DEBUG] Immediate test query SUCCESS in supabase.ts. Data:', data);
+      console.log('[DEBUG] Supabase client query SUCCESS in supabase.ts. Data:', data);
     }
-  } catch (catchError: unknown) { // Changed from any to unknown
-    console.error('[DEBUG] Immediate test query CATCH block in supabase.ts:', catchError);
-    // If you needed to access properties, you would do a type check here:
-    // if (catchError instanceof Error) { console.error(catchError.message); }
+  } catch (catchError: unknown) {
+    console.error('[DEBUG] Supabase client query CATCH block in supabase.ts:', catchError);
+  }
+})();
+
+// TEMPORARY TEST 2: Manual fetch to Supabase endpoint
+console.log('[DEBUG] Attempting manual fetch in supabase.ts');
+(async () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[DEBUG] Manual fetch: Supabase URL or Anon Key is missing.');
+    return;
+  }
+  const fetchUrl = `${supabaseUrl}/rest/v1/user_profiles?select=id&limit=1`;
+  try {
+    console.log(`[DEBUG] Manual fetch URL: ${fetchUrl}`);
+    const response = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log('[DEBUG] Manual fetch response status:', response.status);
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[DEBUG] Manual fetch SUCCESS in supabase.ts. Data:', data);
+    } else {
+      const errorText = await response.text();
+      console.error('[DEBUG] Manual fetch ERROR in supabase.ts. Status:', response.status, 'Text:', errorText);
+    }
+  } catch (catchError: unknown) {
+    console.error('[DEBUG] Manual fetch CATCH block in supabase.ts:', catchError);
   }
 })();
 
