@@ -15,7 +15,8 @@ export const createClient = () => {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        // Remove PKCE flow type for now to fix OAuth issues
+        // Enable PKCE flow for secure OAuth
+        flowType: 'pkce',
         storageKey: 'sb-auth-token',
       },
       global: {

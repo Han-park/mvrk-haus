@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -30,7 +31,29 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      const supabase = await createClient()
+      const cookieStore = await cookies()
+      
+      // Create the server client with proper cookie handling for PKCE
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll: () => cookieStore.getAll(),
+            setAll: (cookiesToSet) => {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                )
+              } catch {
+                // Ignore errors from server components
+              }
+            },
+          },
+        }
+      )
+
+      console.log('Attempting to exchange code for session...')
       const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
       
       if (!exchangeError && data.session) {
@@ -47,7 +70,9 @@ export async function GET(request: Request) {
           redirectUrl = `${origin}${next}`
         }
         
+        console.log('Redirecting to:', redirectUrl)
         const response = NextResponse.redirect(redirectUrl)
+        
         // Add no-cache headers
         response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
         response.headers.set('Pragma', 'no-cache')
@@ -55,7 +80,14 @@ export async function GET(request: Request) {
         return response
       } else {
         console.error('Error exchanging code for session:', exchangeError)
-        const response = NextResponse.redirect(`${origin}/sign-up-june?error=auth_error&message=${encodeURIComponent(exchangeError?.message || 'Unknown error')}`)
+        
+        // More specific error handling for PKCE issues
+        let errorMessage = exchangeError?.message || 'Unknown error'
+        if (errorMessage.includes('code verifier') || errorMessage.includes('PKCE')) {
+          errorMessage = 'Authentication session expired. Please try signing in again.'
+        }
+        
+        const response = NextResponse.redirect(`${origin}/sign-up-june?error=auth_error&message=${encodeURIComponent(errorMessage)}`)
         // Add no-cache headers
         response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
         response.headers.set('Pragma', 'no-cache')
@@ -64,7 +96,14 @@ export async function GET(request: Request) {
       }
     } catch (error) {
       console.error('Unexpected error during auth callback:', error)
-      const response = NextResponse.redirect(`${origin}/sign-up-june?error=unexpected_error&message=${encodeURIComponent(String(error))}`)
+      
+      // Better error message for PKCE-related issues
+      let errorMessage = String(error)
+      if (errorMessage.includes('code verifier') || errorMessage.includes('PKCE')) {
+        errorMessage = 'Authentication session expired. Please try signing in again.'
+      }
+      
+      const response = NextResponse.redirect(`${origin}/sign-up-june?error=unexpected_error&message=${encodeURIComponent(errorMessage)}`)
       // Add no-cache headers
       response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
       response.headers.set('Pragma', 'no-cache')

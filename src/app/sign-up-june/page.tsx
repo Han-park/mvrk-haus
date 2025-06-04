@@ -301,6 +301,47 @@ export default function SignUpJune() {
     const getSessionAndProfile = async () => {
       console.log('🔄 Starting getSessionAndProfile...')
       
+      // Enhanced session debugging
+      console.log('🔍 ENHANCED SESSION DEBUG:')
+      
+      // Check localStorage for Supabase tokens
+      const allLocalStorageKeys = Object.keys(localStorage)
+      const supabaseKeys = allLocalStorageKeys.filter(key => key.includes('supabase') || key.startsWith('sb-'))
+      console.log('🔍 LocalStorage Supabase keys:', supabaseKeys)
+      
+      supabaseKeys.forEach(key => {
+        const value = localStorage.getItem(key)
+        try {
+          const parsed = JSON.parse(value || '{}')
+          console.log(`🔍 ${key}:`, {
+            hasAccessToken: !!parsed.access_token,
+            hasRefreshToken: !!parsed.refresh_token,
+            expiresAt: parsed.expires_at,
+            tokenType: parsed.token_type,
+            user: parsed.user ? { id: parsed.user.id, email: parsed.user.email } : null
+          })
+        } catch (e) {
+          console.log(`🔍 ${key}: (raw)`, value?.substring(0, 100) + '...')
+        }
+      })
+      
+      // Check current domain and storage context
+      console.log('🔍 Storage Context:', {
+        domain: window.location.hostname,
+        protocol: window.location.protocol,
+        origin: window.location.origin,
+        pathname: window.location.pathname,
+        storageAvailable: 'estimate' in (navigator.storage || {})
+      })
+      
+      // Check Supabase client configuration
+      console.log('🔍 Supabase Client Debug:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
+        keyExists: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        clientExists: !!supabase,
+        authExists: !!supabase?.auth
+      })
+      
       // 🔧 FIX: Add timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
         console.log('⏰ getSessionAndProfile timeout - forcing loading to false')
@@ -308,22 +349,15 @@ export default function SignUpJune() {
       }, 10000) // 10 second timeout
       
       try {
-        // 🔧 FIX: Clear any potential stale session data first
-        console.log('🧹 Checking for stale session data...')
-        
         console.log('📡 About to call supabase.auth.getSession()...')
-        console.log('📡 Supabase client status:', {
-          url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          clientExists: !!supabase
-        })
         
         const sessionStartTime = Date.now()
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         const sessionEndTime = Date.now()
         
         console.log('📡 Session fetch completed in', sessionEndTime - sessionStartTime, 'ms')
         console.log('📊 Session result:', session ? 'Session found' : 'No session')
+        console.log('📊 Session error:', sessionError)
         
         if (session) {
           console.log('📊 Session details:', {
@@ -331,73 +365,52 @@ export default function SignUpJune() {
             email: session.user?.email,
             expiresAt: session.expires_at,
             accessTokenExists: !!session.access_token,
+            accessTokenLength: session.access_token?.length,
             refreshTokenExists: !!session.refresh_token,
-            tokenType: session.token_type
-          })
-        }
-        
-        // 🔧 FIX: Validate session is not expired
-        if (session) {
-          const now = Date.now() / 1000
-          const expiresAt = session.expires_at || 0
-          
-          console.log('🕒 Session expiration check:', {
-            now: now,
-            expiresAt: expiresAt,
-            isExpired: expiresAt < now,
-            timeUntilExpiry: expiresAt - now
+            refreshTokenLength: session.refresh_token?.length,
+            tokenType: session.token_type,
+            providerToken: session.provider_token ? 'exists' : 'none',
+            providerRefreshToken: session.provider_refresh_token ? 'exists' : 'none'
           })
           
-          if (expiresAt < now) {
-            console.log('⚠️ Session is expired, refreshing...')
+          // Verify the session is actually valid by making an authenticated request
+          console.log('🔒 Testing session validity with authenticated request...')
+          try {
+            const testStart = Date.now()
+            const { data: authUser, error: authError } = await supabase.auth.getUser()
+            const testEnd = Date.now()
             
-            const refreshStartTime = Date.now()
-            const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
-            const refreshEndTime = Date.now()
-            
-            console.log('🔄 Session refresh completed in', refreshEndTime - refreshStartTime, 'ms')
-            
-            if (refreshError || !refreshedSession) {
-              console.log('❌ Session refresh failed:', refreshError?.message || 'No session returned')
-              console.log('🔧 Signing out due to refresh failure...')
-              await supabase.auth.signOut()
-              setUser(null)
-              setProfile(null)
-              setLoading(false)
-              return
-            }
-            
-            console.log('✅ Session refreshed successfully')
-            console.log('✅ New session details:', {
-              userId: refreshedSession.user?.id,
-              email: refreshedSession.user?.email,
-              expiresAt: refreshedSession.expires_at
+            console.log('🔒 Auth test completed in', testEnd - testStart, 'ms')
+            console.log('🔒 Auth test result:', {
+              hasUser: !!authUser?.user,
+              userId: authUser?.user?.id,
+              email: authUser?.user?.email,
+              error: authError?.message
             })
-            setUser(refreshedSession.user)
             
-            if (refreshedSession.user) {
-              console.log('👤 Calling fetchUserProfile with refreshed session...')
-              await fetchUserProfile(refreshedSession.user.id, refreshedSession)
-            } else {
-              console.log('❌ No user in refreshed session, setting loading to false')
-              setLoading(false)
+            if (authError) {
+              console.log('🚨 Session exists but getUser() failed - session may be invalid')
+              console.log('🚨 Auth error details:', authError)
             }
-            return
+          } catch (authTestError) {
+            console.log('🚨 Exception during auth test:', authTestError)
           }
-        }
-        
-        console.log('✅ Session validation passed, proceeding with existing session')
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          console.log('👤 User found, fetching profile for:', session.user.id)
-          console.log('👤 About to call fetchUserProfile...')
-          await fetchUserProfile(session.user.id, session)
-          console.log('👤 fetchUserProfile call completed')
         } else {
-          // 🔧 FIX: Ensure loading is set to false when no session
-          console.log('📊 No session found, setting loading to false')
-          setLoading(false)
+          console.log('❌ No session found')
+          
+          // Try to get the user anyway (sometimes session is null but user exists)
+          console.log('🔍 Attempting getUser() even without session...')
+          try {
+            const { data: directUser, error: directError } = await supabase.auth.getUser()
+            console.log('🔍 Direct getUser() result:', {
+              hasUser: !!directUser?.user,
+              userId: directUser?.user?.id,
+              email: directUser?.user?.email,
+              error: directError?.message
+            })
+          } catch (directError) {
+            console.log('🔍 Direct getUser() failed:', directError)
+          }
         }
       } catch (error) {
         console.error('💥 Error in getSessionAndProfile:', error)
