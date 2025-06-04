@@ -20,7 +20,7 @@ export const createClient = () => {
         persistSession: true,
         detectSessionInUrl: true,
         flowType: 'pkce',
-        debug: false,
+        debug: true,
       },
       // global: {  // Temporarily comment out this entire block
       //   headers: {
