@@ -94,7 +94,7 @@ export default function SignUpJune() {
           alert('Profile creation failed. Please sign in again.')
           await supabase.auth.signOut()
         }
-      } catch (signOutError) {
+      } catch {
         // Handle sign out error silently
       } finally {
         setLoading(false)
@@ -135,7 +135,7 @@ export default function SignUpJune() {
       if (errorMessage.includes('aborted') || errorMessage.includes('timeout') || errorMessage.includes('network')) {
         try {
           await createUserProfile(userId)
-        } catch (createError) {
+        } catch {
           setLoading(false)
         }
       } else {
@@ -151,20 +151,16 @@ export default function SignUpJune() {
       }, 10000)
       
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const { data: { session } } = await supabase.auth.getSession()
         
         if (session) {
           try {
-            const { data: authUser, error: authError } = await supabase.auth.getUser()
-            
-            if (authError) {
-              // Session exists but getUser() failed - session may be invalid
-            }
-          } catch (authTestError) {
+            await supabase.auth.getUser()
+          } catch {
             // Handle auth test error silently
           }
         }
-      } catch (error) {
+      } catch {
         setLoading(false)
       } finally {
         clearTimeout(timeoutId)
@@ -188,7 +184,7 @@ export default function SignUpJune() {
             setProfile(null)
             setLoading(false)
           }
-        } catch (error) {
+        } catch {
           setLoading(false)
         } finally {
           clearTimeout(timeoutId)
@@ -238,7 +234,7 @@ export default function SignUpJune() {
       if (error) {
         alert('Error signing in: ' + error.message)
       }
-    } catch (error) {
+    } catch {
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -252,7 +248,7 @@ export default function SignUpJune() {
       if (error) {
         alert('Error signing out: ' + error.message)
       }
-    } catch (error) {
+    } catch {
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -404,7 +400,7 @@ export default function SignUpJune() {
       setPasscode(new Array(8).fill(''))
       alert('Passcode verified successfully! Welcome to MVRK HAUS!')
       
-    } catch (error) {
+    } catch {
       alert('Error verifying passcode. Please try again.')
     } finally {
       setPasscodeLoading(false)

@@ -11,11 +11,10 @@ export default function SignIn() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    setMounted(true)
+    // Component mounted - no longer need mounted state since we removed Google login
   }, [])
 
   const fetchUserProfile = useCallback(async (userId: string) => {
@@ -31,7 +30,7 @@ export default function SignIn() {
       }
 
       setProfile(data)
-    } catch (error) {
+    } catch {
       // Handle error silently
     }
   }, [])
@@ -44,7 +43,7 @@ export default function SignIn() {
         setUser(session.user)
         await fetchUserProfile(session.user.id)
       }
-    } catch (error) {
+    } catch {
       // Handle error silently
     } finally {
       setLoading(false)
@@ -86,7 +85,7 @@ export default function SignIn() {
       if (error) {
         alert('Error signing out: ' + error.message)
       }
-    } catch (error) {
+    } catch {
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
