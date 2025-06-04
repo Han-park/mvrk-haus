@@ -19,8 +19,20 @@ export default function SignUpJune() {
   // 🐛 DEBUGGING: Toggle to test hydration issues
   const [debugHydrationError, setDebugHydrationError] = useState(false)
   
-  // OAuth error handling
+  // OAuth error handling with auto-clear
   const [oauthError, setOauthError] = useState<string | null>(null)
+
+  // Auto-clear OAuth error after 10 seconds
+  useEffect(() => {
+    if (oauthError) {
+      const clearTimer = setTimeout(() => {
+        console.log('🧹 Auto-clearing OAuth error after 10 seconds')
+        setOauthError(null)
+      }, 10000) // 10 seconds
+      
+      return () => clearTimeout(clearTimer)
+    }
+  }, [oauthError])
 
   // Ensure component is mounted before accessing browser APIs
   useEffect(() => {
@@ -31,27 +43,58 @@ export default function SignUpJune() {
     // Track page load start
     track('sign_up_june_page_load_start')
     
-    // Check for OAuth errors in URL parameters
+    // Check for OAuth errors in URL parameters - be more specific about error detection
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
       const error = urlParams.get('error')
       const message = urlParams.get('message')
       
-      if (error && message) {
+      // Debug: Log all URL parameters
+      console.log('🔍 URL Parameter Debug:', {
+        fullUrl: window.location.href,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        allParams: Object.fromEntries(urlParams.entries()),
+        errorParam: error,
+        messageParam: message,
+        hasErrorParam: !!error,
+        hasMessageParam: !!message
+      })
+      
+      // Only show OAuth errors if both error and message exist AND they're meaningful
+      if (error && message && message.trim().length > 0 && message !== 'undefined') {
         const decodedMessage = decodeURIComponent(message)
-        setOauthError(`${error}: ${decodedMessage}`)
+        console.log('🚨 OAuth error detected:', { error, message: decodedMessage })
         
-        // Track OAuth errors
-        track('sign_up_june_oauth_error', {
-          error: error,
-          message: decodedMessage
-        })
+        // Only show specific auth-related errors, not generic ones
+        const isAuthError = error.includes('auth') || error.includes('oauth') || 
+                           decodedMessage.includes('code') || decodedMessage.includes('verifier') ||
+                           decodedMessage.includes('authorization') || decodedMessage.includes('token')
         
-        // Clear the error from URL after a delay
-        setTimeout(() => {
-          const newUrl = window.location.pathname
-          window.history.replaceState({}, '', newUrl)
-        }, 5000)
+        if (isAuthError) {
+          setOauthError(`${error}: ${decodedMessage}`)
+          
+          // Track OAuth errors
+          track('sign_up_june_oauth_error', {
+            error: error,
+            message: decodedMessage
+          })
+        } else {
+          console.log('🟡 Non-auth error detected, ignoring:', { error, message: decodedMessage })
+        }
+        
+        // Clear the error from URL immediately to prevent repeat showing
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+        console.log('🧹 Cleared URL parameters, new URL:', newUrl)
+      } else if (error || message) {
+        console.log('🟡 Empty/invalid error parameters detected, clearing URL:', { error, message })
+        // Clear any leftover error parameters
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+        console.log('🧹 Cleared invalid URL parameters, new URL:', newUrl)
+      } else {
+        console.log('✅ No error parameters found in URL')
       }
     }
   }, [])
@@ -977,6 +1020,65 @@ export default function SignUpJune() {
     }
   }
 
+  const clearAllCachedStates = () => {
+    console.log('🧹 CLEARING ALL CACHED STATES:')
+    
+    // Clear OAuth error state
+    setOauthError(null)
+    console.log('  - OAuth error state cleared')
+    
+    // Clear URL parameters
+    const cleanUrl = window.location.pathname
+    window.history.replaceState({}, '', cleanUrl)
+    console.log('  - URL parameters cleared:', cleanUrl)
+    
+    // Clear local storage (Supabase auth tokens)
+    const keysToRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+        keysToRemove.push(key)
+      }
+    }
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key)
+      console.log(`  - Removed localStorage key: ${key}`)
+    })
+    
+    // Clear session storage
+    const sessionKeysToRemove = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+        sessionKeysToRemove.push(key)
+      }
+    }
+    
+    sessionKeysToRemove.forEach(key => {
+      sessionStorage.removeItem(key)
+      console.log(`  - Removed sessionStorage key: ${key}`)
+    })
+    
+    // Force sign out to clear any server-side sessions
+    supabase.auth.signOut().then(() => {
+      console.log('  - Supabase session cleared')
+      
+      // Force page reload to start fresh
+      setTimeout(() => {
+        console.log('  - Forcing page reload...')
+        window.location.reload()
+      }, 1000)
+    }).catch(error => {
+      console.log('  - Error during signOut:', error)
+      // Still reload even if signOut fails
+      setTimeout(() => {
+        console.log('  - Forcing page reload anyway...')
+        window.location.reload()
+      }, 1000)
+    })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -1002,6 +1104,12 @@ export default function SignUpJune() {
                 className="mt-2 px-4 py-2 bg-green-600 text-white rounded text-sm"
               >
                 Check Vercel Health
+              </button>
+              <button 
+                onClick={clearAllCachedStates}
+                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded text-sm"
+              >
+                Clear All Cache & Reload
               </button>
             </div>
           )}
