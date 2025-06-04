@@ -44,6 +44,7 @@ export default function ProfileEdit() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [isPageRefresh, setIsPageRefresh] = useState(false)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -65,15 +66,43 @@ export default function ProfileEdit() {
     '6b': ''
   })
 
+  // Detect if this is a page refresh (vs client-side navigation)
+  useEffect(() => {
+    setIsPageRefresh(performance.navigation?.type === 1 || !window.history.state);
+  }, [])
+
   useEffect(() => {
     const getSessionAndProfile = async () => {
       try {
         console.log('Fetching session and profile');
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
+        
+        // For SSR/page refresh, give more time for session to be established
+        let session = null;
+        let attempts = 0;
+        const maxAttempts = isPageRefresh ? 8 : 3; // More attempts for page refresh
+        
+        // Retry session fetch to handle SSR timing issues
+        while (!session && attempts < maxAttempts) {
+          console.log(`Session attempt ${attempts + 1}/${maxAttempts} (Page refresh: ${isPageRefresh})`);
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          session = currentSession;
+          
+          if (!session && attempts < maxAttempts - 1) {
+            // Wait longer for page refreshes
+            const delay = isPageRefresh ? 800 : 300;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          attempts++;
+        }
         
         if (session?.user) {
+          console.log('Session established successfully:', session.user.id);
+          setUser(session.user)
           await fetchUserProfile(session.user.id)
+        } else {
+          console.log('No session found after retries');
+          setUser(null)
+          setProfile(null)
         }
         
         await fetchRoleTags()
@@ -91,6 +120,7 @@ export default function ProfileEdit() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
+          console.log('Auth state change:', event, 'Session:', !!session);
           setUser(session?.user ?? null)
           
           if (session?.user) {
@@ -131,6 +161,19 @@ export default function ProfileEdit() {
       })
     }
   }, [profile])
+
+  // Check if we should redirect to sign-up page due to failed authentication
+  useEffect(() => {
+    // Add a safety net: if still loading after 10 seconds and no user, something is wrong
+    const safetyTimer = setTimeout(() => {
+      if (loading && !user) {
+        console.log('Safety timeout: No user found after 10 seconds, redirecting to sign-up');
+        window.location.href = '/sign-up-june?error=' + encodeURIComponent('Session expired. Please sign in again.');
+      }
+    }, 10000);
+
+    return () => clearTimeout(safetyTimer);
+  }, [loading, user])
 
   const fetchUserProfile = async (userId: string) => {
     try {
