@@ -140,6 +140,54 @@ ORDER BY cmd, policyname;
 - ✅ Use specific roles instead of `public` when possible
 - ✅ Keep policy logic simple and indexed
 
+### Security Configuration Checklist
+
+#### Database Function Security ✅ **FIXED**
+- ✅ Applied `SET search_path = public` to all functions
+- ✅ Migration: `fix_function_search_path_security` completed
+- ✅ Functions secured: `debug_auth_context`, `handle_new_user`, `update_updated_at_column`, `get_user_role`, `user_has_role_level`, `generate_random_slug`, `set_user_profile_slug`
+
+#### Auth Configuration Security (Manual Steps Required)
+
+**To fix in Supabase Dashboard → Authentication → Settings:**
+
+1. **OTP Expiry Configuration** ⚠️ **NEEDS MANUAL FIX**
+   - Current: > 1 hour (too long)
+   - Recommended: ≤ 1 hour (3600 seconds)
+   - Location: Dashboard → Auth → Settings → Auth → "Email OTP expiry"
+   - Set to: `3600` (1 hour) or `1800` (30 minutes)
+
+2. **Leaked Password Protection** ⚠️ **NEEDS MANUAL FIX**
+   - Current: Disabled
+   - Recommended: Enabled
+   - Location: Dashboard → Auth → Settings → Auth → "Leaked password protection"
+   - Action: Toggle ON to enable HaveIBeenPwned integration
+
+#### Additional Security Recommendations
+
+3. **Password Requirements** (Optional but Recommended)
+   - Location: Dashboard → Auth → Settings → Auth
+   - Consider enabling:
+     - Minimum password length: 8+ characters
+     - Require special characters
+     - Require uppercase/lowercase mix
+
+4. **Session Security**
+   - JWT expiry: Keep default (1 hour)
+   - Refresh token expiry: Keep default (24 hours)
+   - Consider enabling session timeout for sensitive operations
+
+#### Manual Dashboard Steps Summary
+```
+1. Go to Supabase Dashboard → Your Project → Authentication → Settings
+2. Scroll to "Auth" section
+3. Set "Email OTP expiry" to 3600 (1 hour)
+4. Enable "Leaked password protection"
+5. Save changes
+```
+
+After completing these steps, run Performance Advisor again to confirm all security warnings are resolved.
+
 ### Quick Fixes
 - [ ] **Hard Refresh**: Cmd+Shift+R (clears cache)
 - [ ] **Clear Storage**: DevTools → Application → Clear Storage

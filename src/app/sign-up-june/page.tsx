@@ -31,19 +31,19 @@ export default function SignUpJune() {
 
   // 🔧 SAFETY NET: Prevent infinite loading state
   useEffect(() => {
-    const maxLoadingTime = 8000 // 8 seconds maximum loading time
+    const maxLoadingTime = 6000 // 6 seconds maximum loading time (reduced from 8s)
     
     if (loading) {
       const loadingStartTime = Date.now()
       
       const timeoutId = setTimeout(() => {
         const loadingDuration = Date.now() - loadingStartTime
-        console.log('⚠️ SAFETY NET: Forcing loading to false after 8 seconds')
+        console.log('⚠️ SAFETY NET: Forcing loading to false after 6 seconds')
         
         // Track when safety net triggers
         track('sign_up_june_loading_timeout', {
           duration: loadingDuration,
-          trigger: 'safety_net_8s'
+          trigger: 'safety_net_6s'
         })
         
         setLoading(false)
@@ -120,7 +120,14 @@ export default function SignUpJune() {
     
     try {
       console.log('📍 Getting user from session...')
-      const { data: { user } } = await supabase.auth.getUser()
+      
+      // 🔧 FIX: Add timeout to prevent hanging on session fetch
+      const sessionPromise = supabase.auth.getUser()
+      const sessionTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
+      })
+      
+      const { data: { user } } = await Promise.race([sessionPromise, sessionTimeout])
       
       if (!user) {
         console.error('❌ No user found in session')
@@ -131,12 +138,18 @@ export default function SignUpJune() {
       console.log('✅ User found:', user.email)
       console.log('📍 Checking if profile already exists for email...')
       
-      // Check if a profile with this email already exists
-      const { data: existingProfile, error: checkError } = await supabase
+      // 🔧 FIX: Add timeout to profile check query
+      const checkProfilePromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('email', user.email)
         .single()
+      
+      const checkTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile check timeout')), 5000)
+      })
+      
+      const { data: existingProfile, error: checkError } = await Promise.race([checkProfilePromise, checkTimeout])
 
       if (checkError && checkError.code !== 'PGRST116') {
         // Real error (not just "no rows found")
@@ -152,12 +165,20 @@ export default function SignUpJune() {
         // Update the existing profile with the current userId if needed
         if (existingProfile.id !== userId) {
           console.log('📍 Updating existing profile with new userId...')
-          const { data: updatedProfile, error: updateError } = await supabase
+          
+          // 🔧 FIX: Add timeout to update query
+          const updatePromise = supabase
             .from('user_profiles')
             .update({ id: userId })
             .eq('email', user.email)
             .select()
             .single()
+          
+          const updateTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Profile update timeout')), 5000)
+          })
+          
+          const { data: updatedProfile, error: updateError } = await Promise.race([updatePromise, updateTimeout])
             
           if (updateError) {
             console.error('❌ Error updating profile userId:', updateError)
@@ -179,7 +200,8 @@ export default function SignUpJune() {
       console.log('📍 No existing profile found, creating new one...')
       console.log('📝 Creating profile for user:', user.email)
       
-      const { data, error } = await supabase
+      // 🔧 FIX: Add timeout to insert query
+      const insertPromise = supabase
         .from('user_profiles')
         .insert({
           id: userId,
@@ -188,6 +210,12 @@ export default function SignUpJune() {
         })
         .select()
         .single()
+      
+      const insertTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile insert timeout')), 5000)
+      })
+      
+      const { data, error } = await Promise.race([insertPromise, insertTimeout])
 
       if (error) {
         console.error('❌ Error creating user profile:', error)
@@ -216,6 +244,18 @@ export default function SignUpJune() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
+      
+      // 🔧 FIX: Handle timeout errors specifically
+      if (errorMessage.includes('timeout')) {
+        console.log('⏰ Timeout in createUserProfile:', errorMessage)
+        
+        // Track timeout in createUserProfile
+        track('sign_up_june_query_timeout', {
+          userId: userId,
+          timeout: errorMessage,
+          operation: 'createUserProfile'
+        })
+      }
       
       try {
         // Handle deleted user scenario
@@ -279,18 +319,10 @@ export default function SignUpJune() {
       console.log('  🚀 Starting query execution...')
       console.log('  ⏰ Query start time:', new Date().toISOString())
       
-      // Add timeout wrapper around the query
-      const queryPromise = queryBuilder
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000)
-      })
+      // 🔧 FIXED: Remove the 5-second timeout and let Supabase client handle it
+      const { data, error } = await queryBuilder
       
-      console.log('  ⏰ Query timeout set to 5 seconds')
-      console.log('  🏃‍♂️ Executing query with race condition...')
-      
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-      
-      console.log('  ✅ Query race completed')
+      console.log('  ✅ Query completed')
       console.log('  ⏰ Query end time:', new Date().toISOString())
 
       console.log('📊 Query completed')
@@ -335,41 +367,26 @@ export default function SignUpJune() {
       console.error('💥 Error type:', typeof error)
       console.error('💥 Error constructor:', error?.constructor?.name)
       
-      // If it's a timeout, try creating a new profile
-      if (errorMessage === 'Query timeout after 5 seconds') {
-        console.log('⏰ Query timed out after 5 seconds, attempting to create new profile...')
+      // 🔧 SIMPLIFIED: Only handle actual network/connection errors
+      if (errorMessage.includes('aborted') || errorMessage.includes('timeout') || errorMessage.includes('network')) {
+        console.log('🌐 Network/timeout error detected, attempting to create new profile...')
         
-        // Track query timeout
+        // Track network timeout
         track('sign_up_june_query_timeout', {
           userId: userId,
-          timeout: '5s',
-          operation: 'fetchUserProfile'
+          timeout: 'network_error',
+          operation: 'fetchUserProfile',
+          error: errorMessage
         })
         
         try {
           await createUserProfile(userId)
         } catch (createError) {
-          console.error('💥 Failed to create profile after timeout:', createError)
-          setLoading(false)
-        }
-      } else if (errorMessage === 'Query timeout') {
-        console.log('⏰ Query timed out (general), attempting to create new profile...')
-        
-        // Track general query timeout
-        track('sign_up_june_query_timeout', {
-          userId: userId,
-          timeout: 'general',
-          operation: 'fetchUserProfile'
-        })
-        
-        try {
-          await createUserProfile(userId)
-        } catch (createError) {
-          console.error('💥 Failed to create profile after timeout:', createError)
+          console.error('💥 Failed to create profile after network error:', createError)
           setLoading(false)
         }
       } else {
-        console.log('💥 Non-timeout error, setting loading to false')
+        console.log('💥 Non-network error, setting loading to false')
         setLoading(false)
       }
     }

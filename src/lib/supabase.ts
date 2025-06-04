@@ -21,7 +21,7 @@ export const createClient = () =>
         // 🔧 FIX: Add fetch options to prevent hanging requests
         fetch: (url, options = {}) => {
           const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 6000) // 6 second timeout (reduced from 8s)
           
           return fetch(url, {
             ...options,
