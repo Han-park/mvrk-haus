@@ -27,7 +27,7 @@ export default function SignUpJune() {
 
   // 🔧 SAFETY NET: Prevent infinite loading state
   useEffect(() => {
-    const maxLoadingTime = 15000 // 15 seconds maximum loading time
+    const maxLoadingTime = 8000 // 8 seconds maximum loading time
     
     if (loading) {
       const timeoutId = setTimeout(() => {
@@ -257,14 +257,14 @@ export default function SignUpJune() {
       
       // Add timeout wrapper around the query
       const queryPromise = queryBuilder
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000)
       })
       
       console.log('  ⏰ Query timeout set to 5 seconds')
       console.log('  🏃‍♂️ Executing query with race condition...')
       
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
       
       console.log('  ✅ Query race completed')
       console.log('  ⏰ Query end time:', new Date().toISOString())
