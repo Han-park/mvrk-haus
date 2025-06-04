@@ -129,6 +129,7 @@ export default function Directory() {
       console.log('Profile is valid, fetching directory data and role tags.');
       fetchDirectoryData()
       fetchRoleTags()
+      setLoading(false)
     } else if (profile) {
       console.log('Profile exists but role is no_membership or invalid. Role:', profile.role);
       setLoading(false); // Stop loading if profile is fetched but not authorized to see directory
