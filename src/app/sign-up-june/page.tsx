@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
 import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
+import { track } from '@vercel/analytics'
 
 export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
@@ -23,6 +24,9 @@ export default function SignUpJune() {
     debugHydration('SignUpJune')
     setMounted(true)
     debugMountState('SignUpJune', true)
+    
+    // Track page load start
+    track('sign_up_june_page_load_start')
   }, [])
 
   // 🔧 SAFETY NET: Prevent infinite loading state
@@ -30,12 +34,32 @@ export default function SignUpJune() {
     const maxLoadingTime = 8000 // 8 seconds maximum loading time
     
     if (loading) {
+      const loadingStartTime = Date.now()
+      
       const timeoutId = setTimeout(() => {
-        console.log('⚠️ SAFETY NET: Forcing loading to false after 15 seconds')
+        const loadingDuration = Date.now() - loadingStartTime
+        console.log('⚠️ SAFETY NET: Forcing loading to false after 8 seconds')
+        
+        // Track when safety net triggers
+        track('sign_up_june_loading_timeout', {
+          duration: loadingDuration,
+          trigger: 'safety_net_8s'
+        })
+        
         setLoading(false)
       }, maxLoadingTime)
       
-      return () => clearTimeout(timeoutId)
+      return () => {
+        clearTimeout(timeoutId)
+        
+        // Track successful loading completion if timeout is cleared
+        if (!loading) {
+          const loadingDuration = Date.now() - loadingStartTime
+          track('sign_up_june_loading_success', {
+            duration: loadingDuration
+          })
+        }
+      }
     }
   }, [loading])
 
@@ -314,6 +338,14 @@ export default function SignUpJune() {
       // If it's a timeout, try creating a new profile
       if (errorMessage === 'Query timeout after 5 seconds') {
         console.log('⏰ Query timed out after 5 seconds, attempting to create new profile...')
+        
+        // Track query timeout
+        track('sign_up_june_query_timeout', {
+          userId: userId,
+          timeout: '5s',
+          operation: 'fetchUserProfile'
+        })
+        
         try {
           await createUserProfile(userId)
         } catch (createError) {
@@ -322,6 +354,14 @@ export default function SignUpJune() {
         }
       } else if (errorMessage === 'Query timeout') {
         console.log('⏰ Query timed out (general), attempting to create new profile...')
+        
+        // Track general query timeout
+        track('sign_up_june_query_timeout', {
+          userId: userId,
+          timeout: 'general',
+          operation: 'fetchUserProfile'
+        })
+        
         try {
           await createUserProfile(userId)
         } catch (createError) {
