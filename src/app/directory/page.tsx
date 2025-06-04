@@ -23,6 +23,8 @@ interface RoleTag {
 }
 
 export default function Directory() {
+  console.log('[DEBUG] Directory component function body executing...'); // Early log
+
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -32,13 +34,15 @@ export default function Directory() {
   const [selectedRoleTags, setSelectedRoleTags] = useState<number[]>([])
 
   useEffect(() => {
+    console.log('[DEBUG] Main useEffect hook running...'); // This should still appear
+
     // Get initial session and profile
     const getSessionAndProfile = async () => {
-      console.log('Fetching initial session and profile');
+      console.log('[DEBUG] getSessionAndProfile: Attempting to fetch initial session and profile...'); // New first log inside async fn
       const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession()
 
       if (initialSessionError) {
-        console.error('Error fetching initial session:', initialSessionError);
+        console.error('getSessionAndProfile: Error fetching initial session:', initialSessionError);
         setUser(null);
         setProfile(null);
         setLoading(false);
@@ -46,39 +50,47 @@ export default function Directory() {
       }
       
       if (initialSession?.user) {
-        console.log('Initial session received, user ID:', initialSession.user.id);
-        setUser(initialSession.user);
-        await fetchUserProfile(initialSession);
+        console.log('getSessionAndProfile: Initial session received, user ID:', initialSession.user.id);
+        setUser(initialSession.user); 
+        await fetchUserProfile(initialSession); 
       } else {
-        console.log('No initial session or user.');
+        console.log('getSessionAndProfile: No initial session or user.');
         setUser(null);
         setProfile(null);
-        setLoading(false); // No user, stop loading
+        setLoading(false); 
       }
     }
 
-    getSessionAndProfile()
+    getSessionAndProfile() // Call the async function
 
     // Listen for auth changes
-    console.log('Setting up auth state change listener');
+    console.log('[DEBUG] Attempting to set up auth state change listener...');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, authChangeEventSession) => {
-        console.log('Auth state changed. Event:', event, 'Session:', authChangeEventSession);
-        
+        console.log('[DEBUG] onAuthStateChange: Async callback triggered. Event:', event);
+            
         if (authChangeEventSession?.user) {
-          setUser(authChangeEventSession.user);
-          await fetchUserProfile(authChangeEventSession);
+          console.log('[DEBUG] onAuthStateChange: User found in session, setting user and fetching profile. User ID:', authChangeEventSession.user.id);
+          setUser(authChangeEventSession.user); 
+          await fetchUserProfile(authChangeEventSession); 
         } else {
+          console.log('[DEBUG] onAuthStateChange: No user in session, clearing user and profile.');
           setUser(null);
           setProfile(null);
-          if (!authChangeEventSession) {
+        }
+            
+        // If there's no session after an auth change (e.g., user signs out), ensure loading stops.
+        if (!authChangeEventSession) {
+            console.log('[DEBUG] onAuthStateChange: No session (e.g., sign out), ensuring loading is false.');
             setLoading(false);
-          }
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      console.log('[DEBUG] Cleaning up auth state change subscription.');
+      subscription.unsubscribe();
+    }
   }, [])
 
   useEffect(() => {
