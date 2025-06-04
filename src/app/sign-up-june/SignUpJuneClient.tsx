@@ -301,7 +301,8 @@ export default function SignUpJuneClient() {
   const signOut = async () => {
     setLoading(true)
     console.log('[Supabase] supabase.auth.signOut()');
-    const { error: _error } = await supabase.auth.signOut()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
     setPasscode(new Array(8).fill(''))
@@ -420,7 +421,8 @@ export default function SignUpJuneClient() {
 
       // Update user_profiles table
       console.log('Updating user profile role based on passcode for user ID:', user.id);
-      const { data: _updatedProfile, error: profileError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
           role: 'general_member',
