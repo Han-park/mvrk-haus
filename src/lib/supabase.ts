@@ -17,6 +17,16 @@ export const createClient = () =>
         // Optimize for Fluid Compute performance
         headers: {
           'x-client-info': 'mvrk-haus@1.0.0'
+        },
+        // 🔧 FIX: Add fetch options to prevent hanging requests
+        fetch: (url, options = {}) => {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
+          
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeoutId))
         }
       }
     }
