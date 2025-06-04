@@ -114,9 +114,11 @@ export default function Header() {
               {/* Avatar */}
               <div className="w-8 h-8 bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
                 {profile?.avatar_url ? (
-                  <img 
+                  <Image
                     src={profile.avatar_url} 
                     alt="Profile" 
+                    width={32}
+                    height={32}
                     className="w-full h-full object-cover"
                   />
                 ) : (

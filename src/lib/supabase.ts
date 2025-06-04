@@ -15,27 +15,24 @@ export const createClient = () => {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        // Enable PKCE flow for secure OAuth
         flowType: 'pkce',
-        storageKey: 'sb-auth-token',
+        debug: !isProduction,
       },
       global: {
         headers: {
           'x-client-info': 'mvrk-haus@1.0.0',
-          // Add Vercel-specific headers
           ...(isVercel && {
             'x-vercel-cache': 'no-cache',
             'Connection': 'keep-alive'
           })
         },
-        // Enhanced fetch with retry logic for production
         fetch: async (url, options = {}) => {
           const maxRetries = isProduction ? 3 : 1
           const baseTimeout = isProduction ? 10000 : 6000
           
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             const controller = new AbortController()
-            const timeout = baseTimeout + (attempt - 1) * 2000 // Progressive timeout
+            const timeout = baseTimeout + (attempt - 1) * 2000
             const timeoutId = setTimeout(() => controller.abort(), timeout)
             
             try {
@@ -44,7 +41,6 @@ export const createClient = () => {
                 signal: controller.signal,
                 headers: {
                   ...options.headers,
-                  // Add environment-specific headers
                   ...(isProduction && {
                     'Cache-Control': 'no-cache, no-store, must-revalidate',
                     'Pragma': 'no-cache',
@@ -55,15 +51,13 @@ export const createClient = () => {
               
               clearTimeout(timeoutId)
               
-              // If successful, return immediately
               if (response.ok) {
                 return response
               }
               
-              // If server error and we have retries left, continue
               if (response.status >= 500 && attempt < maxRetries) {
                 console.log(`🔄 Retry ${attempt}/${maxRetries} for ${url} (status: ${response.status})`)
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
                 continue
               }
               
@@ -71,19 +65,16 @@ export const createClient = () => {
             } catch (error) {
               clearTimeout(timeoutId)
               
-              // If network error and we have retries left, continue
               if (attempt < maxRetries) {
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error'
                 console.log(`🔄 Retry ${attempt}/${maxRetries} for ${url} (error: ${errorMessage})`)
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
                 continue
               }
               
               throw error
             }
           }
-          
-          // This should never be reached, but TypeScript requires it
           throw new Error('Max retries exceeded')
         }
       }

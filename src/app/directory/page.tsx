@@ -7,6 +7,7 @@ import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
 import BlobHalftoneBackground from '@/components/BlobHalftoneBackground'
+import Image from 'next/image'
 
 interface PrepUser {
   id: number
@@ -287,9 +288,11 @@ export default function Directory() {
                 <div className="flex items-center mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden mr-3">
                     {user.avatar_url ? (
-                      <img 
+                      <Image
                         src={user.avatar_url} 
                         alt="Profile" 
+                        width={48}
+                        height={48}
                         className="w-full h-full object-cover"
                       />
                     ) : (

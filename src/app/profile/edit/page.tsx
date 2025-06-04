@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
+import Image from 'next/image'
 
 interface RoleTag {
   id: number
@@ -420,15 +421,19 @@ export default function ProfileEdit() {
               {/* Current Avatar Display */}
               <div className="w-32 h-32 bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
                 {avatarPreview ? (
-                  <img 
+                  <Image
                     src={avatarPreview} 
                     alt="Avatar preview" 
+                    width={128}
+                    height={128}
                     className="w-full h-full object-cover"
                   />
                 ) : formData.avatar_url ? (
-                  <img 
+                  <Image
                     src={formData.avatar_url} 
                     alt="Current avatar" 
+                    width={128}
+                    height={128}
                     className="w-full h-full object-cover"
                   />
                 ) : (

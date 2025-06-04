@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
+import Image from 'next/image'
 
 export default function SignIn() {
   const [user, setUser] = useState<User | null>(null)
@@ -114,9 +115,11 @@ export default function SignIn() {
               <div className="mb-6">
                 <div className="w-20 h-20 bg-gray-300 mx-auto mb-4 flex items-center justify-center overflow-hidden border border-gray-200">
                   {profile.avatar_url ? (
-                    <img 
+                    <Image 
                       src={profile.avatar_url} 
                       alt="Profile" 
+                      width={80}
+                      height={80}
                       className="w-full h-full object-cover"
                     />
                   ) : (

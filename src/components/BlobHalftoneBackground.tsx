@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import BlobHalftoneCanvas from "./BlobHalftoneCanvas";
 import { generateRandomBlob, generateRandomBlobPresets, BlobOptions } from "@/lib/blobGenerator";
 
@@ -41,7 +41,7 @@ export default function BlobHalftoneBackground({
 }: BlobHalftoneBackgroundProps) {
   const [layers, setLayers] = useState<BlobLayer[]>([]);
 
-  const generateLayers = () => {
+  const generateLayers = useCallback(() => {
     const presets = generateRandomBlobPresets();
     const colors = ["#000000"]; // Black only
     const blendModes = ["multiply"]; // Multiply only
@@ -85,18 +85,18 @@ export default function BlobHalftoneBackground({
     }
 
     setLayers(newLayers);
-  };
+  }, [layerCount]);
 
   useEffect(() => {
     generateLayers();
-  }, [layerCount]);
+  }, [generateLayers]);
 
   useEffect(() => {
     if (autoRefresh) {
       const interval = setInterval(generateLayers, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, generateLayers]);
 
   return (
     <div

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
+import Image from 'next/image'
 
 interface Question {
   id: number
@@ -45,49 +46,6 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true)
   const [questionsLoading, setQuestionsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const getSessionAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setCurrentUser(session?.user ?? null)
-      
-      if (session?.user) {
-        await fetchCurrentUserProfile(session.user.id)
-      }
-      
-      // Fetch questions regardless of authentication
-      await fetchQuestions()
-      
-      // Fetch role tags
-      await fetchRoleTags()
-      
-      setLoading(false)
-    }
-
-    getSessionAndProfile()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setCurrentUser(session?.user ?? null)
-        
-        if (session?.user) {
-          await fetchCurrentUserProfile(session.user.id)
-        } else {
-          setCurrentProfile(null)
-        }
-        
-        setLoading(false)
-      }
-    )
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    if (currentProfile && currentProfile.role !== 'no_membership') {
-      fetchTargetProfile()
-    }
-  }, [currentProfile, slug])
 
   const fetchCurrentUserProfile = async (userId: string) => {
     try {
@@ -158,6 +116,49 @@ export default function UserProfilePage() {
       setLoading(false)
     }
   }, [slug])
+
+  useEffect(() => {
+    const getSessionAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setCurrentUser(session?.user ?? null)
+      
+      if (session?.user) {
+        await fetchCurrentUserProfile(session.user.id)
+      }
+      
+      // Fetch questions regardless of authentication
+      await fetchQuestions()
+      
+      // Fetch role tags
+      await fetchRoleTags()
+      
+      setLoading(false)
+    }
+
+    getSessionAndProfile()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setCurrentUser(session?.user ?? null)
+        
+        if (session?.user) {
+          await fetchCurrentUserProfile(session.user.id)
+        } else {
+          setCurrentProfile(null)
+        }
+        
+        setLoading(false)
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (currentProfile && currentProfile.role !== 'no_membership') {
+      fetchTargetProfile()
+    }
+  }, [currentProfile, slug, fetchTargetProfile])
 
   const fetchQuestions = async () => {
     try {
@@ -316,9 +317,11 @@ export default function UserProfilePage() {
               <div className="flex-shrink-0">
                 <div className="w-32 h-32 bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
                   {targetProfile.avatar_url ? (
-                    <img 
+                    <Image
                       src={targetProfile.avatar_url} 
                       alt="Profile" 
+                      width={128}
+                      height={128}
                       className="w-full h-full object-cover"
                     />
                   ) : (
