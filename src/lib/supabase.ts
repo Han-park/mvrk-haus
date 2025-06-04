@@ -98,8 +98,10 @@ console.log('[DEBUG] Attempting immediate test query in supabase.ts');
     } else {
       console.log('[DEBUG] Immediate test query SUCCESS in supabase.ts. Data:', data);
     }
-  } catch (catchError: any) { // Explicitly type catchError as any for this temporary debug
+  } catch (catchError: unknown) { // Changed from any to unknown
     console.error('[DEBUG] Immediate test query CATCH block in supabase.ts:', catchError);
+    // If you needed to access properties, you would do a type check here:
+    // if (catchError instanceof Error) { console.error(catchError.message); }
   }
 })();
 

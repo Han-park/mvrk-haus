@@ -301,7 +301,6 @@ export default function SignUpJuneClient() {
   const signOut = async () => {
     setLoading(true)
     console.log('[Supabase] supabase.auth.signOut()');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
@@ -421,7 +420,6 @@ export default function SignUpJuneClient() {
 
       // Update user_profiles table
       console.log('Updating user profile role based on passcode for user ID:', user.id);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
