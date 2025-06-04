@@ -1,14 +1,4 @@
 {
-  "version": 2,
-  "functions": {
-    "app/**/*": {
-      "runtime": "fluid"
-    },
-    "api/**/*": {
-      "runtime": "fluid",
-      "maxDuration": 90
-    }
-  },
   "headers": [
     {
       "source": "/auth/callback",
