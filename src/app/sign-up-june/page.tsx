@@ -18,6 +18,9 @@ export default function SignUpJune() {
   
   // 🐛 DEBUGGING: Toggle to test hydration issues
   const [debugHydrationError, setDebugHydrationError] = useState(false)
+  
+  // OAuth error handling
+  const [oauthError, setOauthError] = useState<string | null>(null)
 
   // Ensure component is mounted before accessing browser APIs
   useEffect(() => {
@@ -27,6 +30,30 @@ export default function SignUpJune() {
     
     // Track page load start
     track('sign_up_june_page_load_start')
+    
+    // Check for OAuth errors in URL parameters
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const error = urlParams.get('error')
+      const message = urlParams.get('message')
+      
+      if (error && message) {
+        const decodedMessage = decodeURIComponent(message)
+        setOauthError(`${error}: ${decodedMessage}`)
+        
+        // Track OAuth errors
+        track('sign_up_june_oauth_error', {
+          error: error,
+          message: decodedMessage
+        })
+        
+        // Clear the error from URL after a delay
+        setTimeout(() => {
+          const newUrl = window.location.pathname
+          window.history.replaceState({}, '', newUrl)
+        }, 5000)
+      }
+    }
   }, [])
 
   // 🔧 SAFETY NET: Prevent infinite loading state
@@ -989,6 +1016,25 @@ export default function SignUpJune() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
           <p className="text-gray-600">members only</p>
+          
+          {/* OAuth Error Display */}
+          {oauthError && (
+            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded max-w-lg mx-auto">
+              <h3 className="text-red-600 font-semibold mb-2">🚨 Authentication Error</h3>
+              <p className="text-red-700 text-sm mb-3">{oauthError}</p>
+              <div className="flex flex-col space-y-2">
+                <button
+                  onClick={() => setOauthError(null)}
+                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                >
+                  Dismiss
+                </button>
+                <p className="text-xs text-gray-600">
+                  If this error persists, please try clearing your browser cache or contact support.
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* 🐛 DEBUGGING CONTROLS - Only show in development */}
           {process.env.NODE_ENV === 'development' && (

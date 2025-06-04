@@ -15,11 +15,8 @@ export const createClient = () => {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        // Production-specific auth settings
-        ...(isProduction && {
-          flowType: 'pkce',
-          storageKey: 'sb-auth-token',
-        })
+        // Remove PKCE flow type for now to fix OAuth issues
+        storageKey: 'sb-auth-token',
       },
       global: {
         headers: {
