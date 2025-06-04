@@ -290,9 +290,10 @@ export default function SignUpJuneClient() {
         setUrlError(`Google Sign-In Failed: ${error.message}`)
         setLoading(false)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google Sign-In Exception:', error)
-      setUrlError(`Google Sign-In Exception: ${error.message}`)
+      const message = error instanceof Error ? error.message : 'Unknown Google Sign-in exception'
+      setUrlError(`Google Sign-In Exception: ${message}`)
       setLoading(false)
     }
   }
@@ -300,7 +301,7 @@ export default function SignUpJuneClient() {
   const signOut = async () => {
     setLoading(true)
     console.log('[Supabase] supabase.auth.signOut()');
-    const { error } = await supabase.auth.signOut()
+    const { error: _error } = await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
     setPasscode(new Array(8).fill(''))
@@ -419,7 +420,7 @@ export default function SignUpJuneClient() {
 
       // Update user_profiles table
       console.log('Updating user profile role based on passcode for user ID:', user.id);
-      const { data: updatedProfile, error: profileError } = await supabase
+      const { data: _updatedProfile, error: profileError } = await supabase
         .from('user_profiles')
         .update({
           role: 'general_member',

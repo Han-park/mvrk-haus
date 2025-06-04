@@ -1,4 +1,5 @@
 import { Scene } from "@/components/Scene";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -15,9 +16,9 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center font-roboto-mono text-sm">
           <p className="text-gray-400">Public website coming soon.</p>
           <p className="text-gray-400 mb-4">
-            <a href="/directory" className="text-gray-400 hover:text-gray-200">
+            <Link href="/directory" className="text-gray-400 hover:text-gray-200">
               Are you a MVRK member? Go to <u>directory</u>.
-            </a>
+            </Link>
           </p>
           <p className="text-gray-600">
             by{" "}
