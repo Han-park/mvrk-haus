@@ -155,13 +155,6 @@ export default function Header() {
                   >
                     프로필 수정
                   </Link>
-                  <Link
-                    href="/directory"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-black transition-colors md:hidden"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    Directory
-                  </Link>
                   <hr className="border-black my-1" />
                   <button
                     onClick={handleSignOut}
