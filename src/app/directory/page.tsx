@@ -96,18 +96,24 @@ export default function Directory() {
       const filteredQuery = selectedQuery.eq('id', userId);
       console.log('Query after eq in fetchUserProfile:', filteredQuery);
 
-      console.log('Attempting .single() for fetchUserProfile...');
-      const { data, error } = await filteredQuery.single();
+      console.log('Attempting .select().limit(1) on filteredQuery for fetchUserProfile...');
+      const { data, error } = await filteredQuery.select().limit(1);
 
       if (error) {
-        console.error('Error after .single() in fetchUserProfile in /directory/page.tsx:', error);
+        console.error('Error after .select().limit(1) in fetchUserProfile:', error);
         setProfile(null); // Explicitly set to null on error
-        setLoading(false); // Ensure loading stops
-        return;
       }
 
-      console.log('Successfully fetched user profile data in /directory/page.tsx (after .single()):', data);
-      setProfile(data);
+      if (data && data.length > 0) {
+        console.log('Successfully fetched user profile data in /directory/page.tsx (after .select().limit(1)):', data[0]);
+        setProfile(data[0]); // Assuming data is an array and we want the first item
+      } else if (data) { // data is not null, but might be empty
+        console.log('No user profile data found (empty array) after .select().limit(1).');
+        setProfile(null);
+      } else { // data is null (should be caught by error block but as a safeguard)
+        console.log('User profile data was null after .select().limit(1) and no error reported.');
+        setProfile(null);
+      }
     } catch (error) {
       console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
       setProfile(null); // Explicitly set to null on catch
