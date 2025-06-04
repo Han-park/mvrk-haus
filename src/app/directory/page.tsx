@@ -84,7 +84,8 @@ export default function Directory() {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      console.log('Fetching user profile for user ID:', userId);
+      console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx');
+      console.log('Supabase client object in fetchUserProfile:', supabase);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
