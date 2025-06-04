@@ -4,9 +4,9 @@ export const createClient = () => {
   const isProduction = process.env.NODE_ENV === 'production'
   // const isVercel = process.env.VERCEL === '1' // Commented out as it's no longer used
   
-  console.log('[mvrk-haus-debug] Initializing Supabase client:');
-  console.log('[mvrk-haus-debug] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log('[mvrk-haus-debug] NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Loaded (******)' : 'MISSING or UNDEFINED');
+  // console.log('[mvrk-haus-debug] Initializing Supabase client:');
+  // console.log('[mvrk-haus-debug] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  // console.log('[mvrk-haus-debug] NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Loaded (******)' : 'MISSING or UNDEFINED');
   
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,7 +20,7 @@ export const createClient = () => {
         persistSession: true,
         detectSessionInUrl: true,
         flowType: 'pkce',
-        debug: !isProduction,
+        debug: false,
       },
       // global: {  // Temporarily comment out this entire block
       //   headers: {
