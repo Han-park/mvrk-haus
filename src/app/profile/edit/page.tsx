@@ -67,17 +67,22 @@ export default function ProfileEdit() {
 
   useEffect(() => {
     const getSessionAndProfile = async () => {
-      console.log('Fetching session and profile');
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        await fetchUserProfile(session.user.id)
+      try {
+        console.log('Fetching session and profile');
+        const { data: { session } } = await supabase.auth.getSession()
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          await fetchUserProfile(session.user.id)
+        }
+        
+        await fetchRoleTags()
+        await fetchQuestions()
+      } catch (error) {
+        console.error('Error in getSessionAndProfile:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      await fetchRoleTags()
-      await fetchQuestions()
-      setLoading(false)
     }
 
     getSessionAndProfile()
@@ -85,15 +90,19 @@ export default function ProfileEdit() {
     console.log('Setting up auth state change listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          await fetchUserProfile(session.user.id)
-        } else {
-          setProfile(null)
+        try {
+          setUser(session?.user ?? null)
+          
+          if (session?.user) {
+            await fetchUserProfile(session.user.id)
+          } else {
+            setProfile(null)
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error)
+        } finally {
+          setLoading(false)
         }
-        
-        setLoading(false)
       }
     )
 
@@ -126,6 +135,11 @@ export default function ProfileEdit() {
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log('Fetching user profile for user ID:', userId);
+      console.log('Supabase client info:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Missing',
+        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
+      });
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -134,12 +148,26 @@ export default function ProfileEdit() {
 
       if (error) {
         console.error('Error fetching user profile:', error)
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return
       }
 
+      console.log('Successfully fetched user profile:', data);
       setProfile(data)
     } catch (error) {
       console.error('Error fetching user profile:', error)
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
     }
   }
 
