@@ -25,6 +25,20 @@ export default function SignUpJune() {
     debugMountState('SignUpJune', true)
   }, [])
 
+  // 🔧 SAFETY NET: Prevent infinite loading state
+  useEffect(() => {
+    const maxLoadingTime = 15000 // 15 seconds maximum loading time
+    
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        console.log('⚠️ SAFETY NET: Forcing loading to false after 15 seconds')
+        setLoading(false)
+      }, maxLoadingTime)
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [loading])
+
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
     
@@ -127,20 +141,24 @@ export default function SignUpJune() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('💥 Exception in createUserProfile:', errorMessage)
       
-      // Handle deleted user scenario
-      if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
-        console.log('🚨 User deleted but session corrupted')
-        console.log('🔧 Clearing corrupted session')
-        alert('Your session is corrupted. Please sign in again.')
-        await supabase.auth.signOut()
+      try {
+        // Handle deleted user scenario
+        if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
+          console.log('🚨 User deleted but session corrupted')
+          console.log('🔧 Clearing corrupted session')
+          alert('Your session is corrupted. Please sign in again.')
+          await supabase.auth.signOut()
+        } else {
+          // If profile creation fails, sign the user out
+          alert('Profile creation failed. Please sign in again.')
+          await supabase.auth.signOut()
+        }
+      } catch (signOutError) {
+        console.error('💥 Error during sign out:', signOutError)
+      } finally {
+        // 🔧 CRITICAL: Always set loading to false, no matter what happens
         setLoading(false)
-        return
       }
-      
-      // If profile creation fails, sign the user out
-      alert('Profile creation failed. Please sign in again.')
-      await supabase.auth.signOut()
-      setLoading(false)
     }
   }, [])
 
@@ -201,7 +219,12 @@ export default function SignUpJune() {
       // If it's a timeout, try creating a new profile
       if (errorMessage === 'Query timeout') {
         console.log('⏰ Query timed out, attempting to create new profile...')
-        await createUserProfile(userId)
+        try {
+          await createUserProfile(userId)
+        } catch (createError) {
+          console.error('💥 Failed to create profile after timeout:', createError)
+          setLoading(false)
+        }
       } else {
         setLoading(false)
       }
@@ -212,20 +235,66 @@ export default function SignUpJune() {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
       console.log('🔄 Starting getSessionAndProfile...')
+      
+      // 🔧 FIX: Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ getSessionAndProfile timeout - forcing loading to false')
+        setLoading(false)
+      }, 10000) // 10 second timeout
+      
       try {
+        // 🔧 FIX: Clear any potential stale session data first
+        console.log('🧹 Checking for stale session data...')
+        
         const { data: { session } } = await supabase.auth.getSession()
         console.log('📊 Session result:', session ? 'Session found' : 'No session')
+        
+        // 🔧 FIX: Validate session is not expired
+        if (session) {
+          const now = Date.now() / 1000
+          const expiresAt = session.expires_at || 0
+          
+          if (expiresAt < now) {
+            console.log('⚠️ Session is expired, refreshing...')
+            const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+            
+            if (refreshError || !refreshedSession) {
+              console.log('❌ Session refresh failed, signing out...')
+              await supabase.auth.signOut()
+              setUser(null)
+              setProfile(null)
+              setLoading(false)
+              return
+            }
+            
+            console.log('✅ Session refreshed successfully')
+            setUser(refreshedSession.user)
+            
+            if (refreshedSession.user) {
+              await fetchUserProfile(refreshedSession.user.id, refreshedSession)
+            } else {
+              setLoading(false)
+            }
+            return
+          }
+        }
+        
         setUser(session?.user ?? null)
         
         if (session?.user) {
           console.log('👤 User found, fetching profile for:', session.user.id)
           await fetchUserProfile(session.user.id, session)
+        } else {
+          // 🔧 FIX: Ensure loading is set to false when no session
+          console.log('📊 No session found, setting loading to false')
+          setLoading(false)
         }
       } catch (error) {
         console.error('💥 Error in getSessionAndProfile:', error)
-      } finally {
-        console.log('✅ Setting loading to false')
         setLoading(false)
+      } finally {
+        clearTimeout(timeoutId)
+        console.log('✅ getSessionAndProfile completed')
       }
     }
 
@@ -237,18 +306,26 @@ export default function SignUpJune() {
         console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
         setUser(session?.user ?? null)
         
+        // 🔧 FIX: Add timeout for auth state changes too
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Auth state change timeout - forcing loading to false')
+          setLoading(false)
+        }, 8000) // 8 second timeout
+        
         try {
           if (session?.user) {
             console.log('👤 Auth change - fetching profile for:', session.user.id)
             await fetchUserProfile(session.user.id, session)
           } else {
             setProfile(null)
+            setLoading(false)
           }
         } catch (error) {
           console.error('💥 Error in auth state change:', error)
-        } finally {
-          console.log('✅ Auth change - setting loading to false')
           setLoading(false)
+        } finally {
+          clearTimeout(timeoutId)
+          console.log('✅ Auth state change completed')
         }
       }
     )
@@ -606,7 +683,26 @@ export default function SignUpJune() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-black text-xl">Loading...</div>
+        <div className="text-center">
+          <div className="text-black text-xl mb-4">Loading...</div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-gray-500 text-sm max-w-md">
+              <p>Debug info:</p>
+              <p>Mounted: {mounted ? 'Yes' : 'No'}</p>
+              <p>User: {user ? 'Found' : 'None'}</p>
+              <p>Profile: {profile ? 'Found' : 'None'}</p>
+              <button 
+                onClick={() => {
+                  console.log('🔄 Manual retry triggered')
+                  window.location.reload()
+                }}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded text-sm"
+              >
+                Force Reload (Dev)
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
