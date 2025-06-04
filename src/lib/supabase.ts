@@ -2,7 +2,7 @@ import { createBrowserClient } from '@supabase/ssr'
 
 export const createClient = () => {
   const isProduction = process.env.NODE_ENV === 'production'
-  const isVercel = process.env.VERCEL === '1'
+  // const isVercel = process.env.VERCEL === '1' // Commented out as it's no longer used
   
   console.log('[mvrk-haus-debug] Initializing Supabase client:');
   console.log('[mvrk-haus-debug] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
