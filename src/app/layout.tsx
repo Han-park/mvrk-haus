@@ -26,12 +26,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isProduction = process.env.NODE_ENV === 'production'
+  
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} ${robotoMono.variable} antialiased`}>
         {children}
-        <SpeedInsights />
-        <Analytics />
+        {isProduction && <SpeedInsights />}
+        {isProduction && <Analytics />}
       </body>
     </html>
   );

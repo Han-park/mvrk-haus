@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
-import { track } from '@vercel/analytics'
 
 export default function SignUpJune() {
   const [user, setUser] = useState<User | null>(null)
@@ -14,85 +13,43 @@ export default function SignUpJune() {
   const [mounted, setMounted] = useState(false)
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
-  
-  // OAuth error handling with auto-clear
-  const [oauthError, setOauthError] = useState<string | null>(null)
 
   const createUserProfile = useCallback(async (userId: string) => {
-    console.log('🔨 createUserProfile called for:', userId)
-    
     try {
-      console.log('📍 Getting user from session...')
-      
-      // 🔧 FIX: Add timeout to prevent hanging on session fetch
-      const sessionPromise = supabase.auth.getUser()
-      const sessionTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
-      })
-      
-      const { data: { user } } = await Promise.race([sessionPromise, sessionTimeout])
+      const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
-        console.error('❌ No user found in session')
         setLoading(false)
         return
       }
 
-      console.log('✅ User found:', user.email)
-      console.log('📍 Checking if profile already exists for email...')
-      
-      // 🔧 FIX: Add timeout to profile check query
-      const checkProfilePromise = supabase
+      const { data: existingProfile, error: checkError } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('email', user.email)
         .single()
-      
-      const checkTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Profile check timeout')), 5000)
-      })
-      
-      const { data: existingProfile, error: checkError } = await Promise.race([checkProfilePromise, checkTimeout])
 
       if (checkError && checkError.code !== 'PGRST116') {
-        // Real error (not just "no rows found")
-        console.error('❌ Error checking existing profile:', checkError)
         setLoading(false)
         return
       }
       
       if (existingProfile) {
-        console.log('✅ Profile already exists for email:', user.email)
-        console.log('📍 Using existing profile, role:', existingProfile.role)
-        
-        // Update the existing profile with the current userId if needed
         if (existingProfile.id !== userId) {
-          console.log('📍 Updating existing profile with new userId...')
-          
-          // 🔧 FIX: Add timeout to update query
-          const updatePromise = supabase
+          const { data: updatedProfile, error: updateError } = await supabase
             .from('user_profiles')
             .update({ id: userId })
             .eq('email', user.email)
             .select()
             .single()
-          
-          const updateTimeout = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Profile update timeout')), 5000)
-          })
-          
-          const { data: updatedProfile, error: updateError } = await Promise.race([updatePromise, updateTimeout])
             
           if (updateError) {
-            console.error('❌ Error updating profile userId:', updateError)
             setLoading(false)
             return
           }
           
-          console.log('✅ Profile userId updated successfully')
           setProfile(updatedProfile)
         } else {
-          console.log('✅ Profile userId already matches, using as-is')
           setProfile(existingProfile)
         }
         
@@ -100,11 +57,7 @@ export default function SignUpJune() {
         return
       }
       
-      console.log('📍 No existing profile found, creating new one...')
-      console.log('📝 Creating profile for user:', user.email)
-      
-      // 🔧 FIX: Add timeout to insert query
-      const insertPromise = supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .insert({
           id: userId,
@@ -113,355 +66,132 @@ export default function SignUpJune() {
         })
         .select()
         .single()
-      
-      const insertTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Profile insert timeout')), 5000)
-      })
-      
-      const { data, error } = await Promise.race([insertPromise, insertTimeout])
 
       if (error) {
-        console.error('❌ Error creating user profile:', error)
-        
-        // Handle case where user was deleted but session still exists
         if (error.message?.includes('foreign key') || error.message?.includes('does not exist')) {
-          console.log('🚨 User deleted from auth but session still exists')
-          console.log('🔧 Signing out user to clear corrupted session')
           alert('Your account data was reset. Please sign in again.')
           await supabase.auth.signOut()
           setLoading(false)
           return
         }
         
-        // If we can't create a profile, sign the user out
         alert('Profile creation failed. Please sign in again.')
         await supabase.auth.signOut()
         setLoading(false)
         return
       }
 
-      console.log('✅ Profile created successfully:', data.role)
       setProfile(data)
       setLoading(false)
       
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('💥 Exception in createUserProfile:', errorMessage)
-      
-      // 🔧 FIX: Handle timeout errors specifically
-      if (errorMessage.includes('timeout')) {
-        console.log('⏰ Timeout in createUserProfile:', errorMessage)
-        
-        // Track timeout in createUserProfile
-        track('sign_up_june_query_timeout', {
-          userId: userId,
-          timeout: errorMessage,
-          operation: 'createUserProfile'
-        })
-      }
-      
       try {
-        // Handle deleted user scenario
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
-          console.log('🚨 User deleted but session corrupted')
-          console.log('🔧 Clearing corrupted session')
           alert('Your session is corrupted. Please sign in again.')
           await supabase.auth.signOut()
         } else {
-          // If profile creation fails, sign the user out
           alert('Profile creation failed. Please sign in again.')
           await supabase.auth.signOut()
         }
       } catch (signOutError) {
-        console.error('💥 Error during sign out:', signOutError)
+        // Handle sign out error silently
       } finally {
-        // 🔧 CRITICAL: Always set loading to false, no matter what happens
         setLoading(false)
       }
     }
   }, [])
 
   const fetchUserProfile = useCallback(async (userId: string, existingSession?: Session | null) => {
-    console.log('📝 fetchUserProfile called for:', userId)
-    console.log('🔍 Starting database query...')
-    
     try {
-      // 🔧 FIX: Use existing session if provided, otherwise get a new one
       let session = existingSession
       if (!session) {
-        console.log('📍 Getting session from Supabase...')
         const { data: { session: newSession } } = await supabase.auth.getSession()
         session = newSession
-        console.log('📍 Session retrieved from Supabase')
-      } else {
-        console.log('📍 Using provided session')
       }
       
-      console.log('🔐 Current session exists:', !!session)
-      console.log('🔐 Session user ID:', session?.user?.id)
-      console.log('🔐 Session access token exists:', !!session?.access_token)
-      
-      console.log('⏱️ Executing main query...')
-      
-      // 🔧 DETAILED BREAKDOWN: Add step-by-step logging for the query
-      console.log('🔧 QUERY BREAKDOWN:')
-      console.log('  📊 Building query object...')
-      
-      const queryBuilder = supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single()
       
-      console.log('  📊 Query builder created successfully')
-      console.log('  📊 Target user ID:', userId)
-      console.log('  📊 Query table: user_profiles')
-      console.log('  📊 Query select: *')
-      console.log('  📊 Query filter: id =', userId)
-      
-      console.log('  🚀 Starting query execution...')
-      console.log('  ⏰ Query start time:', new Date().toISOString())
-      
-      // 🔧 FIXED: Remove the 5-second timeout and let Supabase client handle it
-      const { data, error } = await queryBuilder
-      
-      console.log('  ✅ Query completed')
-      console.log('  ⏰ Query end time:', new Date().toISOString())
-
-      console.log('📊 Query completed')
-      console.log('📊 Query error:', error ? error.message : 'None')
-      console.log('📊 Query data:', data ? 'Found' : 'Not found')
-      
       if (error) {
-        console.log('📊 Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        
-        // If no profile found (PGRST116), create a new one
         if (error.code === 'PGRST116') {
-          console.log('❌ No profile found, creating new profile...')
           await createUserProfile(userId)
           return
         }
-        console.error('❌ Error fetching user profile:', error)
-        console.error('❌ Full error object:', JSON.stringify(error, null, 2))
         
         setLoading(false)
         return
       }
 
-      console.log('✅ Profile fetched successfully:', data.role)
-      console.log('✅ Profile data preview:', {
-        id: data.id,
-        email: data.email,
-        role: data.role,
-        created_at: data.created_at
-      })
       setProfile(data)
       setLoading(false)
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('💥 Exception in fetchUserProfile:', errorMessage)
-      console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack')
-      console.error('💥 Error type:', typeof error)
-      console.error('💥 Error constructor:', error?.constructor?.name)
       
-      // 🔧 SIMPLIFIED: Only handle actual network/connection errors
       if (errorMessage.includes('aborted') || errorMessage.includes('timeout') || errorMessage.includes('network')) {
-        console.log('🌐 Network/timeout error detected, attempting to create new profile...')
-        
-        // Track network timeout
-        track('sign_up_june_query_timeout', {
-          userId: userId,
-          timeout: 'network_error',
-          operation: 'fetchUserProfile',
-          error: errorMessage
-        })
-        
         try {
           await createUserProfile(userId)
         } catch (createError) {
-          console.error('💥 Failed to create profile after network error:', createError)
           setLoading(false)
         }
       } else {
-        console.log('💥 Non-network error, setting loading to false')
         setLoading(false)
       }
     }
   }, [createUserProfile])
 
-  // Main session management - moved after fetchUserProfile declaration
   useEffect(() => {
-    // Get initial session and profile
     const getSessionAndProfile = async () => {
-      console.log('🔄 Starting getSessionAndProfile...')
-      
-      // Enhanced session debugging
-      console.log('🔍 ENHANCED SESSION DEBUG:')
-      
-      // Check localStorage for Supabase tokens
-      const allLocalStorageKeys = Object.keys(localStorage)
-      const supabaseKeys = allLocalStorageKeys.filter(key => key.includes('supabase') || key.startsWith('sb-'))
-      console.log('🔍 LocalStorage Supabase keys:', supabaseKeys)
-      
-      supabaseKeys.forEach(key => {
-        const value = localStorage.getItem(key)
-        try {
-          const parsed = JSON.parse(value || '{}')
-          console.log(`🔍 ${key}:`, {
-            hasAccessToken: !!parsed.access_token,
-            hasRefreshToken: !!parsed.refresh_token,
-            expiresAt: parsed.expires_at,
-            tokenType: parsed.token_type,
-            user: parsed.user ? { id: parsed.user.id, email: parsed.user.email } : null
-          })
-        } catch (e) {
-          console.log(`🔍 ${key}: (raw)`, value?.substring(0, 100) + '...')
-        }
-      })
-      
-      // Check current domain and storage context
-      console.log('🔍 Storage Context:', {
-        domain: window.location.hostname,
-        protocol: window.location.protocol,
-        origin: window.location.origin,
-        pathname: window.location.pathname,
-        storageAvailable: 'estimate' in (navigator.storage || {})
-      })
-      
-      // Check Supabase client configuration
-      console.log('🔍 Supabase Client Debug:', {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
-        keyExists: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        clientExists: !!supabase,
-        authExists: !!supabase?.auth
-      })
-      
-      // 🔧 FIX: Add timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
-        console.log('⏰ getSessionAndProfile timeout - forcing loading to false')
         setLoading(false)
-      }, 10000) // 10 second timeout
+      }, 10000)
       
       try {
-        console.log('📡 About to call supabase.auth.getSession()...')
-        
-        const sessionStartTime = Date.now()
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        const sessionEndTime = Date.now()
-        
-        console.log('📡 Session fetch completed in', sessionEndTime - sessionStartTime, 'ms')
-        console.log('📊 Session result:', session ? 'Session found' : 'No session')
-        console.log('📊 Session error:', sessionError)
         
         if (session) {
-          console.log('📊 Session details:', {
-            userId: session.user?.id,
-            email: session.user?.email,
-            expiresAt: session.expires_at,
-            accessTokenExists: !!session.access_token,
-            accessTokenLength: session.access_token?.length,
-            refreshTokenExists: !!session.refresh_token,
-            refreshTokenLength: session.refresh_token?.length,
-            tokenType: session.token_type,
-            providerToken: session.provider_token ? 'exists' : 'none',
-            providerRefreshToken: session.provider_refresh_token ? 'exists' : 'none'
-          })
-          
-          // Verify the session is actually valid by making an authenticated request
-          console.log('🔒 Testing session validity with authenticated request...')
           try {
-            const testStart = Date.now()
             const { data: authUser, error: authError } = await supabase.auth.getUser()
-            const testEnd = Date.now()
-            
-            console.log('🔒 Auth test completed in', testEnd - testStart, 'ms')
-            console.log('🔒 Auth test result:', {
-              hasUser: !!authUser?.user,
-              userId: authUser?.user?.id,
-              email: authUser?.user?.email,
-              error: authError?.message
-            })
             
             if (authError) {
-              console.log('🚨 Session exists but getUser() failed - session may be invalid')
-              console.log('🚨 Auth error details:', authError)
+              // Session exists but getUser() failed - session may be invalid
             }
           } catch (authTestError) {
-            console.log('🚨 Exception during auth test:', authTestError)
-          }
-        } else {
-          console.log('❌ No session found')
-          
-          // Try to get the user anyway (sometimes session is null but user exists)
-          console.log('🔍 Attempting getUser() even without session...')
-          try {
-            const { data: directUser, error: directError } = await supabase.auth.getUser()
-            console.log('🔍 Direct getUser() result:', {
-              hasUser: !!directUser?.user,
-              userId: directUser?.user?.id,
-              email: directUser?.user?.email,
-              error: directError?.message
-            })
-          } catch (directError) {
-            console.log('🔍 Direct getUser() failed:', directError)
+            // Handle auth test error silently
           }
         }
       } catch (error) {
-        console.error('💥 Error in getSessionAndProfile:', error)
-        console.error('💥 Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : 'No stack',
-          type: typeof error,
-          constructor: error?.constructor?.name
-        })
         setLoading(false)
       } finally {
         clearTimeout(timeoutId)
-        console.log('✅ getSessionAndProfile completed, timeout cleared')
       }
     }
 
     getSessionAndProfile()
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
         setUser(session?.user ?? null)
         
-        // 🔧 FIX: Add timeout for auth state changes too
         const timeoutId = setTimeout(() => {
-          console.log('⏰ Auth state change timeout - forcing loading to false')
           setLoading(false)
-        }, 8000) // 8 second timeout
+        }, 8000)
         
         try {
           if (session?.user) {
-            console.log('👤 Auth change - fetching profile for:', session.user.id)
-            console.log('👤 Auth change - about to call fetchUserProfile...')
             await fetchUserProfile(session.user.id, session)
-            console.log('👤 Auth change - fetchUserProfile call completed')
           } else {
-            console.log('📊 Auth change - no session, clearing profile and setting loading to false')
             setProfile(null)
             setLoading(false)
           }
         } catch (error) {
-          console.error('💥 Error in auth state change:', error)
-          console.error('💥 Auth change error details:', {
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : 'No stack'
-          })
           setLoading(false)
         } finally {
           clearTimeout(timeoutId)
-          console.log('✅ Auth state change completed, timeout cleared')
         }
       }
     )
@@ -470,74 +200,29 @@ export default function SignUpJune() {
   }, [fetchUserProfile])
 
   const signInWithGoogle = async () => {
-    console.log('signInWithGoogle called', { mounted })
-    
     if (!mounted) {
-      console.log('signInWithGoogle blocked - component not mounted')
-      return // Prevent execution before mount
+      return
     }
     
     setLoading(true)
     try {
-      // 🔧 DOMAIN FIX: More comprehensive domain handling for OAuth
       const currentOrigin = window.location.origin
       const hostname = window.location.hostname
       
-      console.log('🔗 OAuth Domain Analysis:', {
-        currentOrigin,
-        hostname,
-        isWww: hostname.startsWith('www.'),
-        isVercel: hostname.includes('vercel.app'),
-        isLocalhost: hostname.includes('localhost') || hostname.includes('127.0.0.1')
-      })
-      
-      // 🔧 IMPROVED: Handle all your domain variants
       let baseUrl: string
       if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         baseUrl = currentOrigin
-        console.log('🔗 Using localhost:', baseUrl)
       } else if (hostname.includes('vercel.app')) {
         baseUrl = currentOrigin
-        console.log('🔗 Using vercel domain:', baseUrl)
       } else if (hostname === 'mvrk.haus') {
-        // Redirect users from non-www to www for consistency
         baseUrl = 'https://www.mvrk.haus'
-        console.log('🔗 Using www redirect from non-www:', baseUrl)
       } else if (hostname === 'www.mvrk.haus') {
         baseUrl = currentOrigin
-        console.log('🔗 Using www domain:', baseUrl)
       } else {
-        // Fallback to current origin
         baseUrl = currentOrigin
-        console.log('🔗 Using fallback current origin:', baseUrl)
       }
       
       const fullRedirectUrl = `${baseUrl}/auth/callback?next=/sign-up-june`
-      
-      console.log('OAuth configuration', {
-        currentOrigin,
-        hostname,
-        baseUrl,
-        redirectTo: fullRedirectUrl
-      })
-      
-      console.log('🔗 Google OAuth Debug Info:', {
-        currentOrigin,
-        hostname,
-        baseUrl,
-        fullRedirectUrl,
-        windowLocationHref: window.location.href
-      })
-      
-      // 🔧 EXTRA DEBUG: Log exactly what we're sending to Supabase
-      console.log('🚀 About to call signInWithOAuth with:', {
-        provider: 'google',
-        redirectTo: fullRedirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -551,16 +236,9 @@ export default function SignUpJune() {
       })
       
       if (error) {
-        console.error('❌ Error signing in with Google:', error)
-        console.log('OAuth error', error)
         alert('Error signing in: ' + error.message)
-      } else {
-        console.log('✅ Google OAuth redirect initiated successfully')
-        console.log('OAuth redirect initiated successfully')
       }
     } catch (error) {
-      console.error('💥 Unexpected error during Google OAuth:', error)
-      console.log('OAuth unexpected error', error)
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -572,11 +250,9 @@ export default function SignUpJune() {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('Error signing out:', error.message)
         alert('Error signing out: ' + error.message)
       }
     } catch (error) {
-      console.error('Unexpected error:', error)
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -584,14 +260,12 @@ export default function SignUpJune() {
   }
 
   const handlePasscodeChange = (index: number, value: string) => {
-    // Only allow digits
     if (value && !/^\d$/.test(value)) return
     
     const newPasscode = [...passcode]
     newPasscode[index] = value
     setPasscode(newPasscode)
     
-    // Auto-focus next input - only after component is mounted
     if (mounted && value && index < 7) {
       const nextInput = document.getElementById(`passcode-${index + 1}`)
       nextInput?.focus()
@@ -599,7 +273,6 @@ export default function SignUpJune() {
   }
 
   const handlePasscodeKeyDown = (index: number, e: React.KeyboardEvent) => {
-    // Handle backspace - only after component is mounted
     if (mounted && e.key === 'Backspace' && !passcode[index] && index > 0) {
       const prevInput = document.getElementById(`passcode-${index - 1}`)
       prevInput?.focus()
@@ -617,7 +290,6 @@ export default function SignUpJune() {
     
     setPasscode(newPasscode)
     
-    // Focus the next empty input or the last input - only after component is mounted
     if (mounted) {
       const nextEmptyIndex = pastedData.length < 8 ? pastedData.length : 7
       const nextInput = document.getElementById(`passcode-${nextEmptyIndex}`)
@@ -634,7 +306,6 @@ export default function SignUpJune() {
     
     setPasscodeLoading(true)
     try {
-      // Search for matching passcode in june-otp table
       const { data: otpData, error: otpError } = await supabase
         .from('june-otp')
         .select('*')
@@ -647,49 +318,31 @@ export default function SignUpJune() {
         return
       }
 
-      console.log('Found OTP data:', otpData)
-
-      // Enhanced validation: Check if passcode is registered and user still exists
       if (otpData.is_register && otpData.registered_user_id) {
-        // Check if the registered user still exists in auth.users
         const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.getUserById(otpData.registered_user_id)
         
         if (!authCheckError && existingAuthUser.user) {
-          // User exists - check if it's the same user or different user
           if (otpData.registered_user_id !== user!.id) {
             alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
             setPasscodeLoading(false)
             return
           }
-          // Same user trying to register again
           alert('이 인증번호는 이미 사용되었습니다.')
           setPasscodeLoading(false)
           return
-        } else {
-          // User was deleted from auth - allow reclaim but log it
-          console.log('Registered user was deleted from auth, allowing passcode reclaim:', {
-            passcode: code,
-            deletedUserId: otpData.registered_user_id,
-            deletedEmail: otpData.registered_email,
-            newUserId: user!.id,
-            newEmail: user!.email
-          })
         }
       } else if (otpData.is_register && !otpData.registered_user_id) {
-        // Legacy registered entry without user tracking - block it
         alert('이 인증번호는 이미 사용되었습니다. 다른 인증번호를 사용하거나 문의해주세요.')
         setPasscodeLoading(false)
         return
       }
 
-      // Check if this passcode is already claimed by another user (redundant check but kept for safety)
       if (otpData.registered_user_id && otpData.registered_user_id !== user!.id) {
         alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
         setPasscodeLoading(false)
         return
       }
 
-      // Check if current user already used a different passcode
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('user_profiles')
         .select('role, "june-ot-legalName"')
@@ -697,20 +350,17 @@ export default function SignUpJune() {
         .single()
 
       if (profileCheckError) {
-        console.error('Error checking existing profile:', profileCheckError)
         alert('Error checking profile. Please try again.')
         setPasscodeLoading(false)
         return
       }
 
-      // If user already has general_member role, they've already used a passcode
       if (existingProfile.role === 'general_member' && existingProfile['june-ot-legalName']) {
         alert('이 계정은 이미 다른 인증번호로 등록되어 있습니다.')
         setPasscodeLoading(false)
         return
       }
 
-      // Update user profile with new role and OTP data
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
@@ -731,15 +381,12 @@ export default function SignUpJune() {
         .eq('id', user!.id)
 
       if (updateError) {
-        console.error('Error updating user profile:', updateError)
         alert('Error updating profile. Please try again.')
         setPasscodeLoading(false)
         return
       }
 
-      // Mark the passcode as registered and link it to this user
-      console.log('Attempting to update june-otp table with passcode:', code)
-      const { data: updateData, error: otpUpdateError } = await supabase
+      const { error: otpUpdateError } = await supabase
         .from('june-otp')
         .update({ 
           is_register: true,
@@ -748,274 +395,31 @@ export default function SignUpJune() {
           registered_at: new Date().toISOString()
         })
         .eq('passcode', code)
-        .select()
 
       if (otpUpdateError) {
-        console.error('Error updating OTP registration status:', otpUpdateError)
-        console.error('Error details:', JSON.stringify(otpUpdateError, null, 2))
-        // Don't fail the process if this update fails, just log it
         alert('Profile updated successfully, but there was an issue updating the passcode status. Please contact support if you encounter any issues.')
-      } else {
-        console.log('Successfully updated june-otp table:', updateData)
       }
 
-      // Refresh the user profile to show updated role
       await fetchUserProfile(user!.id)
-      
-      // Clear the passcode inputs
       setPasscode(new Array(8).fill(''))
-      
       alert('Passcode verified successfully! Welcome to MVRK HAUS!')
       
     } catch (error) {
-      console.error('Error verifying passcode:', error)
       alert('Error verifying passcode. Please try again.')
     } finally {
       setPasscodeLoading(false)
     }
   }
 
-  const checkVercelHealth = async () => {
-    console.log('🏗️ VERCEL HEALTH CHECK:')
-    console.log('  Environment:', {
-      NODE_ENV: process.env.NODE_ENV,
-      VERCEL: process.env.VERCEL,
-      VERCEL_ENV: process.env.VERCEL_ENV,
-      VERCEL_REGION: process.env.VERCEL_REGION
-    })
-    
-    // Test Supabase URL reachability
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const healthUrl = `${supabaseUrl}/rest/v1/`
-      
-      const start = Date.now()
-      const response = await fetch(healthUrl, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000)
-      })
-      const duration = Date.now() - start
-      
-      console.log('  Supabase URL health:', {
-        url: healthUrl,
-        status: response.status,
-        duration: `${duration}ms`,
-        ok: response.ok
-      })
-    } catch (error) {
-      console.log('  Supabase URL health: FAILED', error instanceof Error ? error.message : 'Unknown error')
-    }
-    
-    // Test specific table access
-    try {
-      const start = Date.now()
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('count')
-        .limit(1)
-      const duration = Date.now() - start
-      
-      console.log('  Database table access:', {
-        duration: `${duration}ms`,
-        success: !error,
-        error: error?.message,
-        hasData: !!data
-      })
-    } catch (error) {
-      console.log('  Database table access: FAILED', error instanceof Error ? error.message : 'Unknown error')
-    }
-  }
-
-  const clearAllCachedStates = () => {
-    console.log('🧹 CLEARING ALL CACHED STATES:')
-    
-    // Clear OAuth error state
-    setOauthError(null)
-    console.log('  - OAuth error state cleared')
-    
-    // Clear URL parameters
-    const cleanUrl = window.location.pathname
-    window.history.replaceState({}, '', cleanUrl)
-    console.log('  - URL parameters cleared:', cleanUrl)
-    
-    // Clear local storage (Supabase auth tokens)
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-        keysToRemove.push(key)
-      }
-    }
-    
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key)
-      console.log(`  - Removed localStorage key: ${key}`)
-    })
-    
-    // Clear session storage
-    const sessionKeysToRemove = []
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i)
-      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-        sessionKeysToRemove.push(key)
-      }
-    }
-    
-    sessionKeysToRemove.forEach(key => {
-      sessionStorage.removeItem(key)
-      console.log(`  - Removed sessionStorage key: ${key}`)
-    })
-    
-    // Force sign out to clear any server-side sessions
-    supabase.auth.signOut().then(() => {
-      console.log('  - Supabase session cleared')
-      
-      // Force page reload to start fresh
-      setTimeout(() => {
-        console.log('  - Forcing page reload...')
-        window.location.reload()
-      }, 1000)
-    }).catch(error => {
-      console.log('  - Error during signOut:', error)
-      // Still reload even if signOut fails
-      setTimeout(() => {
-        console.log('  - Forcing page reload anyway...')
-        window.location.reload()
-      }, 1000)
-    })
-  }
-
-  // Auto-clear OAuth error after 10 seconds
-  useEffect(() => {
-    if (oauthError) {
-      const clearTimer = setTimeout(() => {
-        console.log('🧹 Auto-clearing OAuth error after 10 seconds')
-        setOauthError(null)
-      }, 10000) // 10 seconds
-      
-      return () => clearTimeout(clearTimer)
-    }
-  }, [oauthError])
-
-  // Ensure component is mounted before accessing browser APIs
   useEffect(() => {
     setMounted(true)
-    
-    // Track page load start
-    track('sign_up_june_page_load_start')
-    
-    // Check for OAuth errors in URL parameters - be more specific about error detection
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const error = urlParams.get('error')
-      const message = urlParams.get('message')
-      
-      // Only show OAuth errors if both error and message exist AND they're meaningful
-      if (error && message && message.trim().length > 0 && message !== 'undefined') {
-        const decodedMessage = decodeURIComponent(message)
-        console.log('🚨 OAuth error detected:', { error, message: decodedMessage })
-        
-        // Only show specific auth-related errors, not generic ones
-        const isAuthError = error.includes('auth') || error.includes('oauth') || 
-                           decodedMessage.includes('code') || decodedMessage.includes('verifier') ||
-                           decodedMessage.includes('authorization') || decodedMessage.includes('token')
-        
-        if (isAuthError) {
-          setOauthError(`${error}: ${decodedMessage}`)
-          
-          // Track OAuth errors
-          track('sign_up_june_oauth_error', {
-            error: error,
-            message: decodedMessage
-          })
-        } else {
-          console.log('🟡 Non-auth error detected, ignoring:', { error, message: decodedMessage })
-        }
-        
-        // Clear the error from URL immediately to prevent repeat showing
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
-        console.log('🧹 Cleared URL parameters, new URL:', newUrl)
-      } else if (error || message) {
-        console.log('🟡 Empty/invalid error parameters detected, clearing URL:', { error, message })
-        // Clear any leftover error parameters
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
-        console.log('🧹 Cleared invalid URL parameters, new URL:', newUrl)
-      } else {
-        console.log('✅ No error parameters found in URL')
-      }
-    }
   }, [])
-
-  // 🔧 SAFETY NET: Prevent infinite loading state
-  useEffect(() => {
-    const maxLoadingTime = 6000 // 6 seconds maximum loading time
-    
-    if (loading) {
-      const loadingStartTime = Date.now()
-      
-      const timeoutId = setTimeout(() => {
-        const loadingDuration = Date.now() - loadingStartTime
-        console.log('⚠️ SAFETY NET: Forcing loading to false after 6 seconds')
-        
-        // Track when safety net triggers
-        track('sign_up_june_loading_timeout', {
-          duration: loadingDuration,
-          trigger: 'safety_net_6s'
-        })
-        
-        setLoading(false)
-      }, maxLoadingTime)
-      
-      return () => {
-        clearTimeout(timeoutId)
-        
-        // Track successful loading completion if timeout is cleared
-        if (!loading) {
-          const loadingDuration = Date.now() - loadingStartTime
-          track('sign_up_june_loading_success', {
-            duration: loadingDuration
-          })
-        }
-      }
-    }
-  }, [loading])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="text-black text-xl mb-4">Loading...</div>
-          {process.env.NODE_ENV === 'development' && (
-            <div className="text-gray-500 text-sm max-w-md">
-              <p>Debug info:</p>
-              <p>Mounted: {mounted ? 'Yes' : 'No'}</p>
-              <p>User: {user ? 'Found' : 'None'}</p>
-              <p>Profile: {profile ? 'Found' : 'None'}</p>
-              <button 
-                onClick={() => {
-                  console.log('🔄 Manual retry triggered')
-                  window.location.reload()
-                }}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded text-sm"
-              >
-                Force Reload (Dev)
-              </button>
-              <button 
-                onClick={checkVercelHealth}
-                className="mt-2 px-4 py-2 bg-green-600 text-white rounded text-sm"
-              >
-                Check Vercel Health
-              </button>
-              <button 
-                onClick={clearAllCachedStates}
-                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded text-sm"
-              >
-                Clear All Cache & Reload
-              </button>
-            </div>
-          )}
         </div>
       </div>
     )
@@ -1027,30 +431,10 @@ export default function SignUpJune() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">MVRK HAUS</h1>
           <p className="text-gray-600">members only</p>
-          
-          {/* OAuth Error Display */}
-          {oauthError && (
-            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded max-w-lg mx-auto">
-              <h3 className="text-red-600 font-semibold mb-2">🚨 Authentication Error</h3>
-              <p className="text-red-700 text-sm mb-3">{oauthError}</p>
-              <div className="flex flex-col space-y-2">
-                <button
-                  onClick={() => setOauthError(null)}
-                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                >
-                  Dismiss
-                </button>
-                <p className="text-xs text-gray-600">
-                  If this error persists, please try clearing your browser cache or contact support.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="max-w-lg mx-auto">
           {user && profile ? (
-            // User is signed in
             <div className="bg-gray-100 p-8 text-center border border-gray-300">
               <div className="mb-6">
                 <div className="w-20 h-20 bg-gray-300 mx-auto mb-4 flex items-center justify-center overflow-hidden border border-gray-200">
@@ -1068,14 +452,12 @@ export default function SignUpJune() {
                 </div>
                 <p className="text-sm text-gray-600 mb-3">{user.email}</p>
                 
-                {/* Display mvrkName or legalName for members */}
                 {(profile.role === 'admin' || profile.role === 'editor' || profile.role === 'general_member' || profile.role === 'no_membership') && (
                   <p className="text-lg text-black font-medium mb-2">
                     {profile.mvrkName || profile['june-ot-legalName'] || 'Member'}
                   </p>
                 )}
                 
-                {/* Role Information */}
                 <div className="mb-4">
                   <div className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
                     profile.role === 'admin' ? 'bg-blue-100 text-blue-600 border border-blue-300' :
@@ -1139,7 +521,6 @@ export default function SignUpJune() {
                   </div>
                 )}
                 
-                {/* Edit Profile Button - Show for all members except awaiting_match */}
                 {profile.role !== 'awaiting_match' && (
                   <a
                     href="/profile/edit"
@@ -1162,7 +543,6 @@ export default function SignUpJune() {
               </div>
             </div>
           ) : (
-            // User is not signed in
             <div className="bg-gray-50 p-8 border border-gray-200">
               <div className="text-center mb-8">
                 <h3 className="text-xl font-semibold mb-2">Get Started</h3>
