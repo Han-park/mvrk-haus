@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
-import { debugLog, debugHydration, debugMountState } from '@/lib/debug'
 import { track } from '@vercel/analytics'
 
 export default function SignUpJune() {
@@ -16,174 +15,8 @@ export default function SignUpJune() {
   const [passcode, setPasscode] = useState<string[]>(new Array(8).fill(''))
   const [passcodeLoading, setPasscodeLoading] = useState(false)
   
-  // 🐛 DEBUGGING: Toggle to test hydration issues
-  const [debugHydrationError, setDebugHydrationError] = useState(false)
-  
   // OAuth error handling with auto-clear
   const [oauthError, setOauthError] = useState<string | null>(null)
-
-  // Auto-clear OAuth error after 10 seconds
-  useEffect(() => {
-    if (oauthError) {
-      const clearTimer = setTimeout(() => {
-        console.log('🧹 Auto-clearing OAuth error after 10 seconds')
-        setOauthError(null)
-      }, 10000) // 10 seconds
-      
-      return () => clearTimeout(clearTimer)
-    }
-  }, [oauthError])
-
-  // Ensure component is mounted before accessing browser APIs
-  useEffect(() => {
-    debugHydration('SignUpJune')
-    setMounted(true)
-    debugMountState('SignUpJune', true)
-    
-    // Track page load start
-    track('sign_up_june_page_load_start')
-    
-    // Check for OAuth errors in URL parameters - be more specific about error detection
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const error = urlParams.get('error')
-      const message = urlParams.get('message')
-      
-      // Debug: Log all URL parameters
-      console.log('🔍 URL Parameter Debug:', {
-        fullUrl: window.location.href,
-        pathname: window.location.pathname,
-        search: window.location.search,
-        allParams: Object.fromEntries(urlParams.entries()),
-        errorParam: error,
-        messageParam: message,
-        hasErrorParam: !!error,
-        hasMessageParam: !!message
-      })
-      
-      // Only show OAuth errors if both error and message exist AND they're meaningful
-      if (error && message && message.trim().length > 0 && message !== 'undefined') {
-        const decodedMessage = decodeURIComponent(message)
-        console.log('🚨 OAuth error detected:', { error, message: decodedMessage })
-        
-        // Only show specific auth-related errors, not generic ones
-        const isAuthError = error.includes('auth') || error.includes('oauth') || 
-                           decodedMessage.includes('code') || decodedMessage.includes('verifier') ||
-                           decodedMessage.includes('authorization') || decodedMessage.includes('token')
-        
-        if (isAuthError) {
-          setOauthError(`${error}: ${decodedMessage}`)
-          
-          // Track OAuth errors
-          track('sign_up_june_oauth_error', {
-            error: error,
-            message: decodedMessage
-          })
-        } else {
-          console.log('🟡 Non-auth error detected, ignoring:', { error, message: decodedMessage })
-        }
-        
-        // Clear the error from URL immediately to prevent repeat showing
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
-        console.log('🧹 Cleared URL parameters, new URL:', newUrl)
-      } else if (error || message) {
-        console.log('🟡 Empty/invalid error parameters detected, clearing URL:', { error, message })
-        // Clear any leftover error parameters
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
-        console.log('🧹 Cleared invalid URL parameters, new URL:', newUrl)
-      } else {
-        console.log('✅ No error parameters found in URL')
-      }
-    }
-  }, [])
-
-  // 🔧 SAFETY NET: Prevent infinite loading state
-  useEffect(() => {
-    const maxLoadingTime = 6000 // 6 seconds maximum loading time (reduced from 8s)
-    
-    if (loading) {
-      const loadingStartTime = Date.now()
-      
-      const timeoutId = setTimeout(() => {
-        const loadingDuration = Date.now() - loadingStartTime
-        console.log('⚠️ SAFETY NET: Forcing loading to false after 6 seconds')
-        
-        // Track when safety net triggers
-        track('sign_up_june_loading_timeout', {
-          duration: loadingDuration,
-          trigger: 'safety_net_6s'
-        })
-        
-        setLoading(false)
-      }, maxLoadingTime)
-      
-      return () => {
-        clearTimeout(timeoutId)
-        
-        // Track successful loading completion if timeout is cleared
-        if (!loading) {
-          const loadingDuration = Date.now() - loadingStartTime
-          track('sign_up_june_loading_success', {
-            duration: loadingDuration
-          })
-        }
-      }
-    }
-  }, [loading])
-
-  // 🔧 NETWORK HEALTH CHECK: Test connectivity when loading starts
-  useEffect(() => {
-    if (loading && mounted) {
-      const checkNetworkHealth = async () => {
-        console.log('🌐 NETWORK HEALTH CHECK: Starting connectivity tests...')
-        
-        // Test 1: Basic fetch to a reliable endpoint
-        try {
-          const fetchStart = Date.now()
-          const response = await fetch('https://httpbin.org/get', { 
-            method: 'GET',
-            signal: AbortSignal.timeout(3000) // 3 second timeout
-          })
-          const fetchEnd = Date.now()
-          
-          console.log('🌐 Basic connectivity test:', {
-            success: response.ok,
-            status: response.status,
-            time: fetchEnd - fetchStart + 'ms'
-          })
-        } catch (error) {
-          console.log('🌐 Basic connectivity test failed:', error instanceof Error ? error.message : 'Unknown error')
-        }
-        
-        // Test 2: Supabase health check
-        try {
-          const supabaseStart = Date.now()
-          const { data, error } = await supabase
-            .from('user_profiles')
-            .select('count')
-            .limit(1)
-          const supabaseEnd = Date.now()
-          
-          console.log('🌐 Supabase connectivity test:', {
-            success: !error,
-            error: error?.message,
-            time: supabaseEnd - supabaseStart + 'ms',
-            hasData: !!data
-          })
-        } catch (error) {
-          console.log('🌐 Supabase connectivity test failed:', error instanceof Error ? error.message : 'Unknown error')
-        }
-        
-        console.log('🌐 Network health check completed')
-      }
-      
-      // Run health check after a short delay to avoid interfering with main logic
-      const healthCheckTimeout = setTimeout(checkNetworkHealth, 2000)
-      return () => clearTimeout(healthCheckTimeout)
-    }
-  }, [loading, mounted])
 
   const createUserProfile = useCallback(async (userId: string) => {
     console.log('🔨 createUserProfile called for:', userId)
@@ -462,6 +295,7 @@ export default function SignUpJune() {
     }
   }, [createUserProfile])
 
+  // Main session management - moved after fetchUserProfile declaration
   useEffect(() => {
     // Get initial session and profile
     const getSessionAndProfile = async () => {
@@ -622,52 +456,11 @@ export default function SignUpJune() {
     return () => subscription.unsubscribe()
   }, [fetchUserProfile])
 
-  // TEMPORARY: Create a version that reproduces the hydration issue
-  const signInWithGoogleBROKEN = async () => {
-    // This will cause hydration errors in desktop Chrome
-    setLoading(true)
-    try {
-      const isProduction = process.env.NODE_ENV === 'production'
-      // ❌ This line causes the hydration error - accessing window during SSR
-      const baseUrl = isProduction ? 'https://mvrk.haus' : window.location.origin
-      
-      console.log('🔗 Google OAuth Debug Info:', {
-        isProduction,
-        baseUrl,
-        currentOrigin: window.location.origin, // ❌ Another hydration error
-        redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`
-      })
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${baseUrl}/auth/callback?next=/sign-up-june`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        }
-      })
-      
-      if (error) {
-        console.error('❌ Error signing in with Google:', error)
-        alert('Error signing in: ' + error.message)
-      } else {
-        console.log('✅ Google OAuth redirect initiated successfully')
-      }
-    } catch (error) {
-      console.error('💥 Unexpected error during Google OAuth:', error)
-      alert('An unexpected error occurred')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const signInWithGoogle = async () => {
-    debugLog('SignUpJune', 'signInWithGoogle called', { mounted })
+    console.log('signInWithGoogle called', { mounted })
     
     if (!mounted) {
-      debugLog('SignUpJune', 'signInWithGoogle blocked - component not mounted')
+      console.log('signInWithGoogle blocked - component not mounted')
       return // Prevent execution before mount
     }
     
@@ -708,7 +501,7 @@ export default function SignUpJune() {
       
       const fullRedirectUrl = `${baseUrl}/auth/callback?next=/sign-up-june`
       
-      debugLog('SignUpJune', 'OAuth configuration', {
+      console.log('OAuth configuration', {
         currentOrigin,
         hostname,
         baseUrl,
@@ -746,15 +539,15 @@ export default function SignUpJune() {
       
       if (error) {
         console.error('❌ Error signing in with Google:', error)
-        debugLog('SignUpJune', 'OAuth error', error)
+        console.log('OAuth error', error)
         alert('Error signing in: ' + error.message)
       } else {
         console.log('✅ Google OAuth redirect initiated successfully')
-        debugLog('SignUpJune', 'OAuth redirect initiated successfully')
+        console.log('OAuth redirect initiated successfully')
       }
     } catch (error) {
       console.error('💥 Unexpected error during Google OAuth:', error)
-      debugLog('SignUpJune', 'OAuth unexpected error', error)
+      console.log('OAuth unexpected error', error)
       alert('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -1079,6 +872,103 @@ export default function SignUpJune() {
     })
   }
 
+  // Auto-clear OAuth error after 10 seconds
+  useEffect(() => {
+    if (oauthError) {
+      const clearTimer = setTimeout(() => {
+        console.log('🧹 Auto-clearing OAuth error after 10 seconds')
+        setOauthError(null)
+      }, 10000) // 10 seconds
+      
+      return () => clearTimeout(clearTimer)
+    }
+  }, [oauthError])
+
+  // Ensure component is mounted before accessing browser APIs
+  useEffect(() => {
+    setMounted(true)
+    
+    // Track page load start
+    track('sign_up_june_page_load_start')
+    
+    // Check for OAuth errors in URL parameters - be more specific about error detection
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const error = urlParams.get('error')
+      const message = urlParams.get('message')
+      
+      // Only show OAuth errors if both error and message exist AND they're meaningful
+      if (error && message && message.trim().length > 0 && message !== 'undefined') {
+        const decodedMessage = decodeURIComponent(message)
+        console.log('🚨 OAuth error detected:', { error, message: decodedMessage })
+        
+        // Only show specific auth-related errors, not generic ones
+        const isAuthError = error.includes('auth') || error.includes('oauth') || 
+                           decodedMessage.includes('code') || decodedMessage.includes('verifier') ||
+                           decodedMessage.includes('authorization') || decodedMessage.includes('token')
+        
+        if (isAuthError) {
+          setOauthError(`${error}: ${decodedMessage}`)
+          
+          // Track OAuth errors
+          track('sign_up_june_oauth_error', {
+            error: error,
+            message: decodedMessage
+          })
+        } else {
+          console.log('🟡 Non-auth error detected, ignoring:', { error, message: decodedMessage })
+        }
+        
+        // Clear the error from URL immediately to prevent repeat showing
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+        console.log('🧹 Cleared URL parameters, new URL:', newUrl)
+      } else if (error || message) {
+        console.log('🟡 Empty/invalid error parameters detected, clearing URL:', { error, message })
+        // Clear any leftover error parameters
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+        console.log('🧹 Cleared invalid URL parameters, new URL:', newUrl)
+      } else {
+        console.log('✅ No error parameters found in URL')
+      }
+    }
+  }, [])
+
+  // 🔧 SAFETY NET: Prevent infinite loading state
+  useEffect(() => {
+    const maxLoadingTime = 6000 // 6 seconds maximum loading time
+    
+    if (loading) {
+      const loadingStartTime = Date.now()
+      
+      const timeoutId = setTimeout(() => {
+        const loadingDuration = Date.now() - loadingStartTime
+        console.log('⚠️ SAFETY NET: Forcing loading to false after 6 seconds')
+        
+        // Track when safety net triggers
+        track('sign_up_june_loading_timeout', {
+          duration: loadingDuration,
+          trigger: 'safety_net_6s'
+        })
+        
+        setLoading(false)
+      }, maxLoadingTime)
+      
+      return () => {
+        clearTimeout(timeoutId)
+        
+        // Track successful loading completion if timeout is cleared
+        if (!loading) {
+          const loadingDuration = Date.now() - loadingStartTime
+          track('sign_up_june_loading_success', {
+            duration: loadingDuration
+          })
+        }
+      }
+    }
+  }, [loading])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -1141,26 +1031,6 @@ export default function SignUpJune() {
                   If this error persists, please try clearing your browser cache or contact support.
                 </p>
               </div>
-            </div>
-          )}
-          
-          {/* 🐛 DEBUGGING CONTROLS - Only show in development */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded">
-              <h3 className="text-red-600 font-semibold mb-2">🐛 Hydration Debug Mode</h3>
-              <button
-                onClick={() => setDebugHydrationError(!debugHydrationError)}
-                className={`px-4 py-2 rounded text-sm font-medium ${
-                  debugHydrationError 
-                    ? 'bg-red-600 text-white' 
-                    : 'bg-green-600 text-white'
-                }`}
-              >
-                {debugHydrationError ? '❌ Using BROKEN version (hydration errors)' : '✅ Using FIXED version (safe)'}
-              </button>
-              <p className="text-xs text-gray-600 mt-2">
-                Toggle to test hydration issues. BROKEN version will fail on desktop Chrome.
-              </p>
             </div>
           )}
         </div>
@@ -1287,7 +1157,7 @@ export default function SignUpJune() {
               </div>
 
               <button
-                onClick={debugHydrationError ? signInWithGoogleBROKEN : signInWithGoogle}
+                onClick={signInWithGoogle}
                 disabled={loading || !mounted}
                 className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 transition-colors duration-200 flex items-center justify-center space-x-3"
               >
@@ -1311,7 +1181,6 @@ export default function SignUpJune() {
                 </svg>
                 <span>
                   {loading ? 'Connecting...' : (!mounted ? 'Loading...' : 'Continue with Google')}
-                  {debugHydrationError && ' (⚠️ BROKEN)'}
                 </span>
               </button>
 
