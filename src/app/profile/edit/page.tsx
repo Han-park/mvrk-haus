@@ -272,7 +272,7 @@ export default function ProfileEdit() {
       controller.abort('Component unmounting')
       subscription.unsubscribe()
     }
-  }, [isPageRefresh])
+  }, [isPageRefresh, isInitialLoad])
 
   useEffect(() => {
     if (profile) {
@@ -492,7 +492,7 @@ export default function ProfileEdit() {
       const filePath = `avatars/${fileName}`
 
       // Upload file to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('user-avatars')
         .upload(filePath, avatarFile, {
           cacheControl: '3600',
