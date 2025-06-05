@@ -1,12 +1,89 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
 import Image from 'next/image'
+
+// Utility types for better error handling
+interface AsyncResult<T> {
+  data: T | null
+  error: string | null
+  success: boolean
+}
+
+interface AsyncOptions {
+  timeout?: number
+  retries?: number
+  signal?: AbortSignal
+}
+
+// Utility function for async operations with timeout and retry
+async function withAsyncRetry<T>(
+  operation: (signal?: AbortSignal) => Promise<T>,
+  options: AsyncOptions = {}
+): Promise<AsyncResult<T>> {
+  const { timeout = 10000, retries = 2 } = options
+  let lastError: string = ''
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const abortController = new AbortController()
+    
+    // If external signal is aborted, abort this operation
+    if (options.signal?.aborted) {
+      return { data: null, error: 'Operation was cancelled', success: false }
+    }
+    
+    // Listen for external signal abort
+    const onExternalAbort = () => abortController.abort('External signal aborted')
+    if (options.signal) {
+      options.signal.addEventListener('abort', onExternalAbort)
+    }
+    
+    try {
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        abortController.abort('Operation timed out')
+      }, timeout)
+      
+      const result = await operation(abortController.signal)
+      clearTimeout(timeoutId)
+      
+      return { data: result, error: null, success: true }
+    } catch (error: unknown) {
+      if (abortController.signal.aborted) {
+        lastError = attempt === retries ? 'Operation timed out' : 'Timeout, retrying...'
+      } else {
+        lastError = error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+      
+      console.warn(`Attempt ${attempt + 1}/${retries + 1} failed:`, lastError)
+      
+      // Don't retry on certain types of errors
+      if (error instanceof Error && (
+        error.message.includes('JWT') ||
+        error.message.includes('unauthorized') ||
+        error.message.includes('forbidden')
+      )) {
+        break
+      }
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < retries && !options.signal?.aborted) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      }
+    } finally {
+      if (options.signal) {
+        options.signal.removeEventListener('abort', onExternalAbort)
+      }
+    }
+  }
+  
+  return { data: null, error: lastError, success: false }
+}
 
 interface RoleTag {
   id: number
@@ -47,6 +124,10 @@ export default function ProfileEdit() {
   const [isPageRefresh, setIsPageRefresh] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   
+  // Refs for cleanup and race condition prevention
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
+  
   // Form state
   const [formData, setFormData] = useState({
     mvrkName: '',
@@ -73,48 +154,74 @@ export default function ProfileEdit() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     const getSessionAndProfile = async () => {
-      try {
-        console.log('Fetching session and profile');
+      if (!mountedRef.current || controller.signal.aborted) return
+      
+      const result = await withAsyncRetry(async (signal) => {
+        if (signal?.aborted) throw new Error('Operation aborted')
+        
+        console.log('Fetching session and profile')
         
         // For SSR/page refresh, give more time for session to be established
-        let session = null;
-        let attempts = 0;
-        const maxAttempts = isPageRefresh ? 8 : 3; // More attempts for page refresh
+        let session = null
+        let attempts = 0
+        const maxAttempts = isPageRefresh ? 8 : 3
         
         // Retry session fetch to handle SSR timing issues
-        while (!session && attempts < maxAttempts) {
-          console.log(`Session attempt ${attempts + 1}/${maxAttempts} (Page refresh: ${isPageRefresh})`);
+        while (!session && attempts < maxAttempts && !signal?.aborted) {
+          console.log(`Session attempt ${attempts + 1}/${maxAttempts} (Page refresh: ${isPageRefresh})`)
           const { data: { session: currentSession } } = await supabase.auth.getSession()
-          session = currentSession;
+          session = currentSession
           
           if (!session && attempts < maxAttempts - 1) {
-            // Wait longer for page refreshes
-            const delay = isPageRefresh ? 800 : 300;
-            await new Promise(resolve => setTimeout(resolve, delay));
+            const delay = isPageRefresh ? 800 : 300
+            await new Promise(resolve => setTimeout(resolve, delay))
           }
-          attempts++;
+          attempts++
         }
+        
+        if (signal?.aborted) throw new Error('Operation aborted')
         
         if (session?.user) {
-          console.log('Session established successfully:', session.user.id);
-          setUser(session.user)
-          await fetchUserProfile(session.user.id)
+          console.log('Session established successfully:', session.user.id)
+          
+          if (mountedRef.current && !signal?.aborted) {
+            setUser(session.user)
+            
+            const profileResult = await fetchUserProfile(session.user.id, signal)
+            if (profileResult.success && profileResult.data) {
+              setProfile(profileResult.data)
+            } else {
+              console.error('Failed to fetch profile:', profileResult.error)
+              setProfile(null)
+            }
+          }
         } else {
-          console.log('No session found after retries');
-          setUser(null)
-          setProfile(null)
+          console.log('No session found after retries')
+          if (mountedRef.current && !signal?.aborted) {
+            setUser(null)
+            setProfile(null)
+          }
         }
         
-        // Always fetch these regardless of user state
-        console.log('Fetching role tags and questions...');
-        await fetchRoleTags()
-        await fetchQuestions()
-        console.log('Completed fetching role tags and questions.');
-      } catch (error) {
-        console.error('Error in getSessionAndProfile:', error)
-      } finally {
-        console.log('Initial load completed, setting loading to false');
+        return session
+      }, { signal: controller.signal, timeout: 20000, retries: 2 })
+
+      // Always fetch role tags and questions regardless of user state
+      console.log('Fetching role tags and questions...')
+      await Promise.all([
+        fetchRoleTags(),
+        fetchQuestions()
+      ])
+      console.log('Completed fetching role tags and questions.')
+
+      if (mountedRef.current && !controller.signal.aborted) {
+        if (!result.success) {
+          console.error('Session establishment failed:', result.error)
+        }
         setIsInitialLoad(false)
         setLoading(false)
       }
@@ -122,33 +229,49 @@ export default function ProfileEdit() {
 
     getSessionAndProfile()
 
-    console.log('Setting up auth state change listener');
+    console.log('Setting up auth state change listener')
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mountedRef.current || controller.signal.aborted || isInitialLoad) {
+          console.log('Ignoring auth state change during initial load or if unmounted')
+          return
+        }
+        
+        console.log('Auth state change:', event, 'Session:', !!session, 'Initial load:', isInitialLoad)
+        
         try {
-          console.log('Auth state change:', event, 'Session:', !!session, 'Initial load:', isInitialLoad);
-          
-          // Don't handle auth state changes during initial load
-          if (isInitialLoad) {
-            console.log('Ignoring auth state change during initial load');
-            return;
-          }
-          
-          setUser(session?.user ?? null)
-          
-          if (session?.user) {
-            await fetchUserProfile(session.user.id)
-          } else {
-            setProfile(null)
+          if (mountedRef.current && !controller.signal.aborted) {
+            setUser(session?.user ?? null)
+            
+            if (session?.user) {
+              const profileResult = await fetchUserProfile(session.user.id, controller.signal)
+              if (mountedRef.current && !controller.signal.aborted) {
+                if (profileResult.success && profileResult.data) {
+                  setProfile(profileResult.data)
+                } else {
+                  console.error('Failed to fetch profile on auth change:', profileResult.error)
+                  setProfile(null)
+                }
+              }
+            } else {
+              setProfile(null)
+            }
           }
         } catch (error) {
-          console.error('Error in auth state change:', error)
+          if (mountedRef.current && !controller.signal.aborted) {
+            console.error('Error in auth state change:', error)
+            setUser(null)
+            setProfile(null)
+          }
         }
-        // Don't set loading to false here anymore - only in initial load
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mountedRef.current = false
+      controller.abort('Component unmounting')
+      subscription.unsubscribe()
+    }
   }, [isPageRefresh])
 
   useEffect(() => {
@@ -178,23 +301,21 @@ export default function ProfileEdit() {
   useEffect(() => {
     // Add a safety net: if still loading after 10 seconds and no user, something is wrong
     const safetyTimer = setTimeout(() => {
-      if (loading && !user) {
-        console.log('Safety timeout: No user found after 10 seconds, redirecting to sign-up');
-        window.location.href = '/sign-up-june?error=' + encodeURIComponent('Session expired. Please sign in again.');
+      if (loading && !user && mountedRef.current) {
+        console.log('Safety timeout: No user found after 10 seconds, redirecting to sign-up')
+        window.location.href = '/sign-up-june?error=' + encodeURIComponent('Session expired. Please sign in again.')
       }
-    }, 10000);
+    }, 10000)
 
-    return () => clearTimeout(safetyTimer);
+    return () => clearTimeout(safetyTimer)
   }, [loading, user])
 
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      console.log('Fetching user profile for user ID:', userId);
-      console.log('Supabase client info:', {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Missing',
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
-      });
+  const fetchUserProfile = async (userId: string, signal?: AbortSignal): Promise<AsyncResult<UserProfile>> => {
+    const operation = async (abortSignal?: AbortSignal) => {
+      console.log('Fetching user profile for user ID:', userId)
       
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
+
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -202,68 +323,81 @@ export default function ProfileEdit() {
         .single()
 
       if (error) {
-        console.error('Error fetching user profile:', error)
-        console.error('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        // Don't return here - set profile to null and continue
-        setProfile(null)
-        return
+        throw new Error(`Failed to fetch user profile: ${error.message}`)
       }
 
-      console.log('Successfully fetched user profile:', data);
-      setProfile(data)
-    } catch (error) {
-      console.error('Error fetching user profile:', error)
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
+      if (!data) {
+        throw new Error('User profile not found')
       }
-      // Set profile to null on error
-      setProfile(null)
+
+      return data
     }
+
+    return await withAsyncRetry(operation, { signal, timeout: 15000, retries: 2 })
   }
 
-  const fetchRoleTags = async () => {
-    try {
-      console.log('Fetching role tags from user_profile_roleTagId_enum');
+  const fetchRoleTags = async (): Promise<AsyncResult<RoleTag[]>> => {
+    const operation = async (signal?: AbortSignal) => {
+      console.log('Fetching role tags...')
+      
+      if (signal?.aborted) throw new Error('Operation aborted')
+
       const { data, error } = await supabase
-        .from('user_profile_roleTagId_enum')
+        .from('role_tags')
         .select('*')
-        .order('id')
+        .order('roleTagName')
 
       if (error) {
-        console.error('Error fetching role tags:', error)
-      } else {
-        setRoleTags(data || [])
+        throw new Error(`Failed to fetch role tags: ${error.message}`)
       }
-    } catch (error) {
-      console.error('Error fetching role tags:', error)
+
+      const tags = data || []
+      
+      if (mountedRef.current && !signal?.aborted) {
+        setRoleTags(tags)
+      }
+
+      return tags
     }
+
+    return await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 10000, 
+      retries: 2 
+    })
   }
 
-  const fetchQuestions = async () => {
-    try {
-      console.log('Fetching questions from openhaus_questions_enum');
+  const fetchQuestions = async (): Promise<AsyncResult<Question[]>> => {
+    const operation = async (signal?: AbortSignal) => {
+      console.log('Fetching questions...')
+      
+      if (signal?.aborted) throw new Error('Operation aborted')
+
       const { data, error } = await supabase
-        .from('openhaus_questions_enum')
+        .from('questions')
         .select('*')
         .order('question_id')
 
       if (error) {
-        console.error('Error fetching questions:', error)
-      } else {
-        setQuestions(data || [])
+        console.warn('Failed to fetch questions from database:', error.message)
+        // Use fallback questions if database fetch fails
+        return []
       }
-    } catch (error) {
-      console.error('Error fetching questions:', error)
+
+      const questions = data || []
+      
+      if (mountedRef.current && !signal?.aborted) {
+        setQuestions(questions)
+      }
+
+      return questions
     }
+
+    return await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 10000, 
+      retries: 1 // Only retry once for questions since we have fallbacks
+    })
   }
 
   const getQuestionName = (questionId: string): string => {
@@ -272,6 +406,8 @@ export default function ProfileEdit() {
   }
 
   const handleInputChange = (field: string, value: string | number) => {
+    if (!mountedRef.current) return
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -279,39 +415,35 @@ export default function ProfileEdit() {
   }
 
   const validateSlug = (slug: string): boolean => {
-    // Allow only lowercase letters, numbers, and underscores
-    const slugRegex = /^[a-z0-9_]*$/
-    return slug.length <= 20 && slugRegex.test(slug)
+    // Allow letters, numbers, hyphens, and underscores
+    return /^[a-zA-Z0-9_-]+$/.test(slug) && slug.length >= 3 && slug.length <= 30
   }
 
   const handleSlugChange = (value: string) => {
-    // Convert to lowercase and validate
-    const lowercaseValue = value.toLowerCase()
-    if (validateSlug(lowercaseValue)) {
-      handleInputChange('slug', lowercaseValue)
-    }
+    if (!mountedRef.current) return
+    
+    // Convert to lowercase and replace spaces with hyphens
+    const cleanSlug = value.toLowerCase().replace(/\s+/g, '-')
+    setFormData(prev => ({
+      ...prev,
+      slug: cleanSlug
+    }))
   }
 
   const toggleRoleTag = (tagId: number) => {
-    setFormData(prev => {
-      const isCurrentlySelected = prev.roleTagIds.includes(tagId)
-      
-      // If trying to add a new tag but already have 5, don't allow it
-      if (!isCurrentlySelected && prev.roleTagIds.length >= 5) {
-        alert('You can select up to 5 role tags only.')
-        return prev
-      }
-      
-      return {
-        ...prev,
-        roleTagIds: isCurrentlySelected
-          ? prev.roleTagIds.filter(id => id !== tagId)
-          : [...prev.roleTagIds, tagId]
-      }
-    })
+    if (!mountedRef.current) return
+    
+    setFormData(prev => ({
+      ...prev,
+      roleTagIds: prev.roleTagIds.includes(tagId)
+        ? prev.roleTagIds.filter(id => id !== tagId)
+        : [...prev.roleTagIds, tagId]
+    }))
   }
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!mountedRef.current) return
+    
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -321,131 +453,188 @@ export default function ProfileEdit() {
       return
     }
 
-    // Validate file size (max 5MB)
+    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB')
+      alert('File size must be less than 5MB')
       return
     }
 
     setAvatarFile(file)
-    
+
     // Create preview
     const reader = new FileReader()
     reader.onload = (e) => {
-      setAvatarPreview(e.target?.result as string)
+      if (mountedRef.current) {
+        setAvatarPreview(e.target?.result as string)
+      }
     }
     reader.readAsDataURL(file)
   }
 
   const removeAvatar = () => {
+    if (!mountedRef.current) return
+    
     setAvatarFile(null)
     setAvatarPreview(null)
     setFormData(prev => ({ ...prev, avatar_url: '' }))
   }
 
-  const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile || !user) return null
+  const uploadAvatar = async (): Promise<AsyncResult<string>> => {
+    if (!avatarFile || !user) {
+      return { data: null, error: 'No file or user available', success: false }
+    }
 
-    setUploading(true)
-    try {
-      // Delete existing avatar if it exists
-      if (formData.avatar_url) {
-        const oldPath = formData.avatar_url.split('/').pop()
-        if (oldPath) {
-          console.log('Removing existing avatar from storage:', oldPath);
-          await supabase.storage
-            .from('avatars')
-            .remove([`${user.id}/${oldPath}`])
-        }
-      }
-
-      // Upload new avatar
+    const operation = async (signal?: AbortSignal) => {
+      if (signal?.aborted) throw new Error('Upload cancelled')
+      
       const fileExt = avatarFile.name.split('.').pop()
-      const fileName = `avatar-${Date.now()}.${fileExt}`
-      const filePath = `${user.id}/${fileName}`
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
 
-      console.log('Uploading new avatar to storage:', filePath);
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile)
+      // Upload file to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('user-avatars')
+        .upload(filePath, avatarFile, {
+          cacheControl: '3600',
+          upsert: false
+        })
 
       if (uploadError) {
-        throw uploadError
+        throw new Error(`Avatar upload failed: ${uploadError.message}`)
       }
+
+      if (signal?.aborted) throw new Error('Upload cancelled')
 
       // Get public URL
-      console.log('Getting public URL for avatar:', filePath);
-      const { data } = supabase.storage
-        .from('avatars')
+      const { data: urlData } = supabase.storage
+        .from('user-avatars')
         .getPublicUrl(filePath)
 
-      return data.publicUrl
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-      alert('Error uploading image. Please try again.')
-      return null
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user || !profile) return
-
-    setSaving(true)
-    try {
-      let avatarUrl = formData.avatar_url
-
-      // Upload new avatar if one was selected
-      if (avatarFile) {
-        const newAvatarUrl = await uploadAvatar()
-        if (newAvatarUrl) {
-          avatarUrl = newAvatarUrl
-        } else {
-          // If upload failed, don't proceed with form submission
-          setSaving(false)
-          return
-        }
+      if (!urlData.publicUrl) {
+        throw new Error('Failed to get avatar URL')
       }
 
-      console.log('Updating user profile with data:', formData);
+      return urlData.publicUrl
+    }
+
+    return await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 30000, 
+      retries: 2 
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent): Promise<AsyncResult<void>> => {
+    e.preventDefault()
+
+    if (!user || !profile || !mountedRef.current) {
+      return { data: null, error: 'Missing user or profile data', success: false }
+    }
+
+    // Basic validation
+    if (!formData.mvrkName.trim()) {
+      return { data: null, error: 'MVRK Name is required', success: false }
+    }
+
+    if (formData.slug && !validateSlug(formData.slug)) {
+      return { data: null, error: 'Slug must be 3-30 characters long and contain only letters, numbers, hyphens, and underscores', success: false }
+    }
+
+    const operation = async (signal?: AbortSignal) => {
+      setSaving(true)
+
+      if (signal?.aborted) throw new Error('Save cancelled')
+
+      let avatarUrl = formData.avatar_url
+
+      // Upload avatar if there's a new file
+      if (avatarFile) {
+        setUploading(true)
+        
+        const uploadResult = await uploadAvatar()
+        
+        if (!uploadResult.success || !uploadResult.data) {
+          throw new Error(uploadResult.error || 'Avatar upload failed')
+        }
+        
+        avatarUrl = uploadResult.data
+        setUploading(false)
+      }
+
+      if (signal?.aborted) throw new Error('Save cancelled')
+
+      // Update profile
       const { error } = await supabase
         .from('user_profiles')
         .update({
-          mvrkName: formData.mvrkName,
-          bio: formData.bio,
-          instagramId: formData.instagramId,
-          slug: formData.slug,
+          mvrkName: formData.mvrkName.trim(),
+          bio: formData.bio.trim(),
+          instagramId: formData.instagramId.trim(),
+          slug: formData.slug.trim() || null,
           roleTagIds: formData.roleTagIds,
           avatar_url: avatarUrl,
-          '1a': formData['1a'],
-          '2a': formData['2a'],
-          '3a': formData['3a'],
-          '4a': formData['4a'],
-          '1b': formData['1b'],
-          '2b': formData['2b'],
-          '3b': formData['3b'],
-          '4b': formData['4b'],
-          '5b': formData['5b'],
-          '6b': formData['6b']
+          '1a': formData['1a'].trim(),
+          '2a': formData['2a'].trim(),
+          '3a': formData['3a'].trim(),
+          '4a': formData['4a'].trim(),
+          '1b': formData['1b'].trim(),
+          '2b': formData['2b'].trim(),
+          '3b': formData['3b'].trim(),
+          '4b': formData['4b'].trim(),
+          '5b': formData['5b'].trim(),
+          '6b': formData['6b'].trim(),
         })
         .eq('id', user.id)
 
       if (error) {
-        console.error('Error updating profile:', error)
-        alert('Error updating profile. Please try again.')
-        return
+        throw new Error(`Profile update failed: ${error.message}`)
       }
 
-      alert('Profile updated successfully!')
-      router.push('/sign-up-june')
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      alert('Error updating profile. Please try again.')
-    } finally {
-      setSaving(false)
+      if (signal?.aborted) throw new Error('Save cancelled')
+
+      // Refresh profile data
+      const profileResult = await fetchUserProfile(user.id, signal)
+      if (profileResult.success && profileResult.data && mountedRef.current) {
+        setProfile(profileResult.data)
+      }
+
+      return undefined
     }
+
+    const result = await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 45000, 
+      retries: 2 
+    })
+
+    if (mountedRef.current) {
+      setSaving(false)
+      setUploading(false)
+      
+      if (result.success) {
+        // Clear avatar file state after successful upload
+        setAvatarFile(null)
+        setAvatarPreview(null)
+        
+        // Show success message
+        setTimeout(() => {
+          if (mountedRef.current) {
+            alert('Profile updated successfully!')
+          }
+        }, 100)
+        
+        // Navigate back after a short delay
+        setTimeout(() => {
+          if (mountedRef.current) {
+            router.push('/directory')
+          }
+        }, 1000)
+      } else {
+        alert(result.error || 'Failed to update profile. Please try again.')
+      }
+    }
+
+    return result
   }
 
   if (loading) {

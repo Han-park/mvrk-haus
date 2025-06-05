@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User, Session, Subscription } from '@supabase/supabase-js'
@@ -8,6 +8,83 @@ import { UserProfile } from '@/types/auth'
 import Header from '@/components/Header'
 import BlobHalftoneBackground from '@/components/BlobHalftoneBackground'
 import Image from 'next/image'
+
+// Utility types for better error handling
+interface AsyncResult<T> {
+  data: T | null
+  error: string | null
+  success: boolean
+}
+
+interface AsyncOptions {
+  timeout?: number
+  retries?: number
+  signal?: AbortSignal
+}
+
+// Utility function for async operations with timeout and retry
+async function withAsyncRetry<T>(
+  operation: (signal?: AbortSignal) => Promise<T>,
+  options: AsyncOptions = {}
+): Promise<AsyncResult<T>> {
+  const { timeout = 10000, retries = 2 } = options
+  let lastError: string = ''
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const abortController = new AbortController()
+    
+    // If external signal is aborted, abort this operation
+    if (options.signal?.aborted) {
+      return { data: null, error: 'Operation was cancelled', success: false }
+    }
+    
+    // Listen for external signal abort
+    const onExternalAbort = () => abortController.abort('External signal aborted')
+    if (options.signal) {
+      options.signal.addEventListener('abort', onExternalAbort)
+    }
+    
+    try {
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        abortController.abort('Operation timed out')
+      }, timeout)
+      
+      const result = await operation(abortController.signal)
+      clearTimeout(timeoutId)
+      
+      return { data: result, error: null, success: true }
+    } catch (error: unknown) {
+      if (abortController.signal.aborted) {
+        lastError = attempt === retries ? 'Operation timed out' : 'Timeout, retrying...'
+      } else {
+        lastError = error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+      
+      console.warn(`Attempt ${attempt + 1}/${retries + 1} failed:`, lastError)
+      
+      // Don't retry on certain types of errors
+      if (error instanceof Error && (
+        error.message.includes('JWT') ||
+        error.message.includes('unauthorized') ||
+        error.message.includes('forbidden')
+      )) {
+        break
+      }
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < retries && !options.signal?.aborted) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      }
+    } finally {
+      if (options.signal) {
+        options.signal.removeEventListener('abort', onExternalAbort)
+      }
+    }
+  }
+  
+  return { data: null, error: lastError, success: false }
+}
 
 interface PrepUser {
   id: number
@@ -23,7 +100,7 @@ interface RoleTag {
 }
 
 export default function Directory() {
-  console.log('[DEBUG] Directory component function body executing...'); // Early log
+  console.log('[DEBUG] Directory component function body executing...');
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -33,227 +110,315 @@ export default function Directory() {
   const [roleTags, setRoleTags] = useState<RoleTag[]>([])
   const [selectedRoleTags, setSelectedRoleTags] = useState<number[]>([])
 
+  // Refs for cleanup and race condition prevention
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
+
   useEffect(() => {
-    console.log('[DEBUG] Main useEffect hook: START'); // 1. First log in the effect
+    console.log('[DEBUG] Main useEffect hook: START');
+    
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     const getSessionAndProfile = async () => {
-      console.log('[DEBUG] getSessionAndProfile: START'); // 2. Log at start of this async function
-      try {
-        const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession();
+      console.log('[DEBUG] getSessionAndProfile: START');
+      
+      if (!mountedRef.current || controller.signal.aborted) return
+      
+      const result = await withAsyncRetry(async (signal) => {
+        if (signal?.aborted) throw new Error('Operation aborted')
+        
+        const { data: { session: initialSession }, error: initialSessionError } = await supabase.auth.getSession()
 
         if (initialSessionError) {
-          console.error('getSessionAndProfile: Error fetching initial session:', initialSessionError);
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          return;
+          throw new Error(`Error fetching initial session: ${initialSessionError.message}`)
         }
         
         if (initialSession?.user) {
-          console.log('getSessionAndProfile: Initial session received, user ID:', initialSession.user.id);
-          setUser(initialSession.user); 
-          await fetchUserProfile(initialSession); 
+          console.log('getSessionAndProfile: Initial session received, user ID:', initialSession.user.id)
+          
+          if (mountedRef.current && !signal?.aborted) {
+            setUser(initialSession.user)
+            
+            const profileResult = await fetchUserProfile(initialSession, signal)
+            if (profileResult.success && profileResult.data) {
+              setProfile(profileResult.data)
+            } else {
+              console.error('Failed to fetch profile:', profileResult.error)
+              setProfile(null)
+            }
+          }
         } else {
-          console.log('getSessionAndProfile: No initial session or user.');
-          setUser(null);
-          setProfile(null);
-          setLoading(false); 
+          console.log('getSessionAndProfile: No initial session or user.')
+          if (mountedRef.current && !signal?.aborted) {
+            setUser(null)
+            setProfile(null)
+          }
         }
-      } catch (error) {
-        // Catch any unexpected errors during getSessionAndProfile
-        console.error('getSessionAndProfile: CRITICAL UNEXPECTED ERROR:', error);
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
+        
+        return initialSession
+      }, { signal: controller.signal, timeout: 15000, retries: 2 })
+
+      if (mountedRef.current && !controller.signal.aborted) {
+        if (!result.success) {
+          console.error('getSessionAndProfile failed:', result.error)
+          setUser(null)
+          setProfile(null)
+        }
+        setLoading(false)
       }
-      console.log('[DEBUG] getSessionAndProfile: END'); // 3. Log at end of this async function
-    };
-
-    getSessionAndProfile(); // Call the function
-
-    console.log('[DEBUG] Main useEffect hook: After getSessionAndProfile() call'); // 4. Log after sync call returns
-
-    let activeSubscription: Subscription | undefined = undefined; // Typed and initialized
-
-    try {
-      console.log('[DEBUG] Main useEffect hook: Attempting to set up onAuthStateChange listener...'); // 5. Log before setup
-      const handlerResult = supabase.auth.onAuthStateChange(
-        async (event, authChangeEventSession) => {
-          console.log('[DEBUG] onAuthStateChange: Async callback triggered. Event:', event);
-              
-          if (authChangeEventSession?.user) {
-            console.log('[DEBUG] onAuthStateChange: User found, setting user & fetching profile. User ID:', authChangeEventSession.user.id);
-            setUser(authChangeEventSession.user); 
-            await fetchUserProfile(authChangeEventSession); 
-          } else {
-            console.log('[DEBUG] onAuthStateChange: No user in session, clearing user/profile.');
-            setUser(null);
-            setProfile(null);
-          }
-              
-          if (!authChangeEventSession) {
-              console.log('[DEBUG] onAuthStateChange: No session (e.g., sign out), ensuring loading is false.');
-              setLoading(false);
-          }
-        }
-      );
       
-      // Safely access the subscription
-      if (handlerResult && handlerResult.data && handlerResult.data.subscription) {
-        activeSubscription = handlerResult.data.subscription;
-        console.log('[DEBUG] Main useEffect hook: onAuthStateChange listener SUCCEEDED and subscription obtained.'); // 6. Success
-      } else {
-        console.error('[DEBUG] Main useEffect hook: onAuthStateChange listener FAILED to return expected data structure (subscription missing). Handler response:', handlerResult); // 7. Failure
-      }
-    } catch (error) {
-      console.error('[DEBUG] Main useEffect hook: CRITICAL ERROR setting up onAuthStateChange listener:', error); // 8. Catch error
+      console.log('[DEBUG] getSessionAndProfile: END');
     }
 
-    console.log('[DEBUG] Main useEffect hook: END SYNC WORK'); // 9. End of synchronous part of useEffect
+    getSessionAndProfile()
+
+    console.log('[DEBUG] Main useEffect hook: After getSessionAndProfile() call');
+
+    let activeSubscription: Subscription | undefined = undefined
+
+    try {
+      console.log('[DEBUG] Main useEffect hook: Attempting to set up onAuthStateChange listener...');
+      const handlerResult = supabase.auth.onAuthStateChange(
+        async (event, authChangeEventSession) => {
+          if (!mountedRef.current || controller.signal.aborted) return
+          
+          console.log('[DEBUG] onAuthStateChange: Async callback triggered. Event:', event)
+              
+          try {
+            if (authChangeEventSession?.user) {
+              console.log('[DEBUG] onAuthStateChange: User found, setting user & fetching profile. User ID:', authChangeEventSession.user.id)
+              
+              if (mountedRef.current) {
+                setUser(authChangeEventSession.user)
+                
+                const profileResult = await fetchUserProfile(authChangeEventSession, controller.signal)
+                if (mountedRef.current && !controller.signal.aborted) {
+                  if (profileResult.success && profileResult.data) {
+                    setProfile(profileResult.data)
+                  } else {
+                    console.error('Failed to fetch profile on auth change:', profileResult.error)
+                    setProfile(null)
+                  }
+                }
+              }
+            } else {
+              console.log('[DEBUG] onAuthStateChange: No user in session, clearing user/profile.')
+              if (mountedRef.current) {
+                setUser(null)
+                setProfile(null)
+              }
+            }
+            
+            if (!authChangeEventSession) {
+              console.log('[DEBUG] onAuthStateChange: No session (e.g., sign out), ensuring loading is false.')
+              if (mountedRef.current) {
+                setLoading(false)
+              }
+            }
+          } catch (error) {
+            if (mountedRef.current && !controller.signal.aborted) {
+              console.error('Error in auth state change:', error)
+              setUser(null)
+              setProfile(null)
+              setLoading(false)
+            }
+          }
+        }
+      )
+      
+      if (handlerResult && handlerResult.data && handlerResult.data.subscription) {
+        activeSubscription = handlerResult.data.subscription
+        console.log('[DEBUG] Main useEffect hook: onAuthStateChange listener SUCCEEDED and subscription obtained.')
+      } else {
+        console.error('[DEBUG] Main useEffect hook: onAuthStateChange listener FAILED to return expected data structure (subscription missing). Handler response:', handlerResult)
+      }
+    } catch (error) {
+      console.error('[DEBUG] Main useEffect hook: CRITICAL ERROR setting up onAuthStateChange listener:', error)
+    }
+
+    console.log('[DEBUG] Main useEffect hook: END SYNC WORK')
 
     return () => {
-      console.log('[DEBUG] Main useEffect hook: Cleanup function running.'); // 10. Cleanup start
+      console.log('[DEBUG] Main useEffect hook: Cleanup function running.')
+      mountedRef.current = false
+      controller.abort('Component unmounting')
+      
       if (activeSubscription && typeof activeSubscription.unsubscribe === 'function') {
-        console.log('[DEBUG] Main useEffect hook: Attempting to unsubscribe.');
-        activeSubscription.unsubscribe();
-        console.log('[DEBUG] Main useEffect hook: Unsubscribe called.');
+        console.log('[DEBUG] Main useEffect hook: Attempting to unsubscribe.')
+        activeSubscription.unsubscribe()
+        console.log('[DEBUG] Main useEffect hook: Unsubscribe called.')
       } else {
-        console.log('[DEBUG] Main useEffect hook: No valid subscription to unsubscribe from.');
+        console.log('[DEBUG] Main useEffect hook: No valid subscription to unsubscribe from.')
       }
-    };
-  }, []) // Empty dependency array means this runs once on mount and cleans up on unmount
+    }
+  }, [])
 
   useEffect(() => {
-    console.log('Profile state changed in /directory/page.tsx. Current profile:', profile);
+    console.log('Profile state changed in /directory/page.tsx. Current profile:', profile)
+    
     if (profile && profile.role !== 'no_membership') {
-      console.log('Profile is valid, fetching directory data and role tags.');
-      fetchDirectoryData()
-      fetchRoleTags()
-      setLoading(false)
+      console.log('Profile is valid, fetching directory data and role tags.')
+      
+      // Use Promise.all for concurrent operations
+      Promise.all([
+        fetchDirectoryData(),
+        fetchRoleTags()
+      ]).then(() => {
+        if (mountedRef.current) {
+          setLoading(false)
+        }
+      }).catch((error) => {
+        console.error('Error fetching directory data or role tags:', error)
+        if (mountedRef.current) {
+          setLoading(false)
+        }
+      })
     } else if (profile) {
-      console.log('Profile exists but role is no_membership or invalid. Role:', profile.role);
-      setLoading(false); // Stop loading if profile is fetched but not authorized to see directory
+      console.log('Profile exists but role is no_membership or invalid. Role:', profile.role)
+      setLoading(false)
     } else {
-      console.log('Profile is null. Not fetching directory data.');
+      console.log('Profile is null. Not fetching directory data.')
     }
   }, [profile])
 
-  const fetchUserProfile = async (currentSession: Session | null) => {
-    try {
+  const fetchUserProfile = async (currentSession: Session | null, signal?: AbortSignal): Promise<AsyncResult<UserProfile>> => {
+    const operation = async (abortSignal?: AbortSignal) => {
       if (!currentSession || !currentSession.user) {
-        console.log('fetchUserProfile called with no session or no user.');
-        setProfile(null);
-        setLoading(false); // Stop loading if no session/user
-        return;
+        throw new Error('No session or user provided')
       }
-      const userId = currentSession.user.id;
-      console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx, using provided session.');
-      console.log('Supabase client object in fetchUserProfile:', supabase);
+      
+      const userId = currentSession.user.id
+      console.log('Fetching user profile for user ID:', userId, 'in /directory/page.tsx, using provided session.')
 
-      console.log('[DEBUG] Using provided session. Access token exists:', !!currentSession.access_token);
-      console.log('[DEBUG] Session appears valid, proceeding to check env vars.');
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
       if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Supabase URL or Anon Key is not defined in environment variables.');
-        setProfile(null);
-        setLoading(false);
-        return;
+        throw new Error('Supabase URL or Anon Key is not defined in environment variables')
       }
 
-      console.log('[DEBUG] Environment variables (URL/Key) appear valid.');
+      console.log('[DEBUG] Environment variables (URL/Key) appear valid.')
 
-      const profileUrl = `${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}&select=*`;
+      const profileUrl = `${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}&select=*`
       
-      console.log('Attempting direct fetch to:', profileUrl);
+      console.log('Attempting direct fetch to:', profileUrl)
+
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
 
       const response = await fetch(profileUrl, {
         headers: {
           'apikey': supabaseAnonKey,
           'Authorization': `Bearer ${currentSession.access_token}`,
           'Content-Type': 'application/json'
-        }
-      });
+        },
+        signal: abortSignal
+      })
 
-      console.log('Direct fetch response status:', response.status);
+      console.log('Direct fetch response status:', response.status)
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Error fetching user profile via direct fetch:', response.status, errorData);
-        setProfile(null);
-        setLoading(false);
-        return;
+        const errorData = await response.text()
+        throw new Error(`Error fetching user profile via direct fetch: ${response.status} ${errorData}`)
       }
 
-      const profiles = await response.json();
+      const profiles = await response.json()
 
       if (profiles && profiles.length > 0) {
-        console.log('Successfully fetched user profile data via direct fetch:', profiles[0]);
-        setProfile(profiles[0]);
+        console.log('Successfully fetched user profile data via direct fetch:', profiles[0])
+        return profiles[0]
       } else {
-        console.log('No user profile data found via direct fetch or profiles array is empty.');
-        setProfile(null);
+        throw new Error('No user profile data found or profiles array is empty')
       }
-    } catch (error) {
-      console.error('Catch block error in fetchUserProfile in /directory/page.tsx:', error);
-      setProfile(null); 
-      setLoading(false);
     }
+
+    return await withAsyncRetry(operation, { signal, timeout: 15000, retries: 2 })
   }
 
-  const fetchDirectoryData = async () => {
-    try {
-      // Fetch registered users (excluding no_membership)
-      console.log('Fetching registered users from user_profiles');
-      const { data: users, error: usersError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .neq('role', 'no_membership')
+  const fetchDirectoryData = async (): Promise<AsyncResult<{ users: UserProfile[], prepUsers: PrepUser[] }>> => {
+    const operation = async (signal?: AbortSignal) => {
+      console.log('Fetching directory data...')
+      
+      if (signal?.aborted) throw new Error('Operation aborted')
 
-      if (usersError) {
-        console.error('Error fetching users:', usersError)
-      } else {
-        setRegisteredUsers(users || [])
+      // Fetch both registered and preparatory users concurrently
+      const [registeredResult, prepResult] = await Promise.all([
+        supabase
+          .from('user_profiles')
+          .select('*')
+          .in('role', ['admin', 'editor', 'general_member']),
+        supabase
+          .from('june-otp')
+          .select('*')
+      ])
+
+      if (signal?.aborted) throw new Error('Operation aborted')
+
+      if (registeredResult.error) {
+        throw new Error(`Error fetching registered users: ${registeredResult.error.message}`)
       }
 
-      // Fetch preparatory users (is_register = false)
-      console.log('Fetching preparatory users from june-otp');
-      const { data: prepUsers, error: prepError } = await supabase
-        .from('june-otp')
-        .select('*')
-        .eq('is_register', false)
-
-      if (prepError) {
-        console.error('Error fetching preparatory users:', prepError)
-      } else {
-        setPreparatoryUsers(prepUsers || [])
+      if (prepResult.error) {
+        throw new Error(`Error fetching preparatory users: ${prepResult.error.message}`)
       }
-    } catch (error) {
-      console.error('Error fetching directory data:', error)
+
+      const users = registeredResult.data || []
+      const prepUsers = prepResult.data || []
+
+      console.log('Directory data fetched successfully. Users:', users.length, 'Prep users:', prepUsers.length)
+
+      if (mountedRef.current && !signal?.aborted) {
+        setRegisteredUsers(users)
+        setPreparatoryUsers(prepUsers)
+      }
+
+      return { users, prepUsers }
     }
+
+    return await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 15000, 
+      retries: 2 
+    })
   }
 
-  const fetchRoleTags = async () => {
-    try {
-      console.log('Fetching role tags from user_profile_roleTagId_enum');
+  const fetchRoleTags = async (): Promise<AsyncResult<RoleTag[]>> => {
+    const operation = async (signal?: AbortSignal) => {
+      console.log('Fetching role tags...')
+      
+      if (signal?.aborted) throw new Error('Operation aborted')
+
       const { data, error } = await supabase
-        .from('user_profile_roleTagId_enum')
+        .from('role_tags')
         .select('*')
-        .order('id')
+        .order('roleTagName')
 
       if (error) {
-        console.error('Error fetching role tags:', error)
-      } else {
-        setRoleTags(data || [])
+        throw new Error(`Error fetching role tags: ${error.message}`)
       }
-    } catch (error) {
-      console.error('Error fetching role tags:', error)
+
+      const tags = data || []
+      console.log('Role tags fetched successfully:', tags.length)
+
+      if (mountedRef.current && !signal?.aborted) {
+        setRoleTags(tags)
+      }
+
+      return tags
     }
+
+    return await withAsyncRetry(operation, { 
+      signal: abortControllerRef.current?.signal, 
+      timeout: 10000, 
+      retries: 2 
+    })
   }
 
   const toggleRoleTag = (tagId: number) => {
+    if (!mountedRef.current) return
+    
     setSelectedRoleTags(prev => 
       prev.includes(tagId) 
         ? prev.filter(id => id !== tagId)

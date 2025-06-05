@@ -1,12 +1,89 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { UserProfile, ROLE_INFO } from '@/types/auth'
 import Image from 'next/image'
+
+// Utility types for better error handling
+interface AsyncResult<T> {
+  data: T | null
+  error: string | null
+  success: boolean
+}
+
+interface AsyncOptions {
+  timeout?: number
+  retries?: number
+  signal?: AbortSignal
+}
+
+// Utility function for async operations with timeout and retry
+async function withAsyncRetry<T>(
+  operation: (signal?: AbortSignal) => Promise<T>,
+  options: AsyncOptions = {}
+): Promise<AsyncResult<T>> {
+  const { timeout = 10000, retries = 2 } = options
+  let lastError: string = ''
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const abortController = new AbortController()
+    
+    // If external signal is aborted, abort this operation
+    if (options.signal?.aborted) {
+      return { data: null, error: 'Operation was cancelled', success: false }
+    }
+    
+    // Listen for external signal abort
+    const onExternalAbort = () => abortController.abort('External signal aborted')
+    if (options.signal) {
+      options.signal.addEventListener('abort', onExternalAbort)
+    }
+    
+    try {
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        abortController.abort('Operation timed out')
+      }, timeout)
+      
+      const result = await operation(abortController.signal)
+      clearTimeout(timeoutId)
+      
+      return { data: result, error: null, success: true }
+    } catch (error: unknown) {
+      if (abortController.signal.aborted) {
+        lastError = attempt === retries ? 'Operation timed out' : 'Timeout, retrying...'
+      } else {
+        lastError = error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+      
+      console.warn(`Attempt ${attempt + 1}/${retries + 1} failed:`, lastError)
+      
+      // Don't retry on certain types of errors
+      if (error instanceof Error && (
+        error.message.includes('JWT') ||
+        error.message.includes('unauthorized') ||
+        error.message.includes('forbidden')
+      )) {
+        break
+      }
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < retries && !options.signal?.aborted) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      }
+    } finally {
+      if (options.signal) {
+        options.signal.removeEventListener('abort', onExternalAbort)
+      }
+    }
+  }
+  
+  return { data: null, error: lastError, success: false }
+}
 
 export default function SignUpJuneClient() {
   const [user, setUser] = useState<User | null>(null)
@@ -18,6 +95,10 @@ export default function SignUpJuneClient() {
   const [urlMessage, setUrlMessage] = useState<string | null>(null)
   const [urlError, setUrlError] = useState<string | null>(null)
   const searchParams = useSearchParams()
+  
+  // Refs for cleanup and race condition prevention
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
 
   // Handle URL parameters for messages and errors
   useEffect(() => {
@@ -28,26 +109,34 @@ export default function SignUpJuneClient() {
       if (message) {
         setUrlMessage(message)
         // Clear message after 5 seconds
-        setTimeout(() => setUrlMessage(null), 5000)
+        setTimeout(() => {
+          if (mountedRef.current) setUrlMessage(null)
+        }, 5000)
       }
       
       if (error) {
         setUrlError(error)
         // Clear error after 5 seconds
-        setTimeout(() => setUrlError(null), 5000)
+        setTimeout(() => {
+          if (mountedRef.current) setUrlError(null)
+        }, 5000)
       }
     }
   }, [mounted, searchParams])
 
-  const createUserProfile = useCallback(async (userId: string) => {
-    try {
+  const createUserProfile = useCallback(async (userId: string, signal?: AbortSignal): Promise<AsyncResult<UserProfile>> => {
+    const operation = async (abortSignal?: AbortSignal) => {
       console.log('[Supabase] supabase.auth.getUser in createUserProfile');
+      
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
+      
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
-        setLoading(false)
-        return
+        throw new Error('User not found')
       }
+
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
 
       console.log('Checking for existing profile by email:', user.email);
       const { data: existingProfile, error: checkError } = await supabase
@@ -56,14 +145,15 @@ export default function SignUpJuneClient() {
         .eq('email', user.email)
         .single()
 
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
+
       if (checkError && checkError.code !== 'PGRST116') {
-        setLoading(false)
-        return
+        throw new Error(`Profile check failed: ${checkError.message}`)
       }
       
       if (existingProfile) {
         if (existingProfile.id !== userId) {
-          console.log('[Supabase] supabase.from(\'user_profiles\').update({ id: userId }).eq(\'email\', user.email) in createUserProfile (updateError)');
+          console.log('[Supabase] Updating existing profile with new user ID');
           const { data: updatedProfile, error: updateError } = await supabase
             .from('user_profiles')
             .update({ id: userId })
@@ -72,20 +162,16 @@ export default function SignUpJuneClient() {
             .single()
             
           if (updateError) {
-            setLoading(false)
-            return
+            throw new Error(`Profile update failed: ${updateError.message}`)
           }
           
-          setProfile(updatedProfile)
+          return updatedProfile
         } else {
-          setProfile(existingProfile)
+          return existingProfile
         }
-        
-        setLoading(false)
-        return
       }
       
-      console.log('[Supabase] supabase.from(\'user_profiles\').insert() in createUserProfile');
+      console.log('[Supabase] Creating new user profile');
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -98,53 +184,31 @@ export default function SignUpJuneClient() {
 
       if (error) {
         if (error.message?.includes('foreign key') || error.message?.includes('does not exist')) {
-          alert('Your account data was reset. Please sign in again.')
-          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (foreign key error)');
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
+          throw new Error('Account data reset required - please sign in again')
         }
-        
-        alert('Profile creation failed. Please sign in again.')
-        console.log('[Supabase] supabase.auth.signOut() in createUserProfile (profile creation failed)');
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
+        throw new Error(`Profile creation failed: ${error.message}`)
       }
 
-      setProfile(data)
-      setLoading(false)
-      
-    } catch (error: unknown) {
-      try {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
-          alert('Your session is corrupted. Please sign in again.')
-          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (JWT/user not found error)');
-          await supabase.auth.signOut()
-        } else {
-          alert('Profile creation failed. Please sign in again.')
-          console.log('[Supabase] supabase.auth.signOut() in createUserProfile (other error)');
-          await supabase.auth.signOut()
-        }
-      } catch {
-        // Handle sign out error silently
-      } finally {
-        setLoading(false)
-      }
+      return data
     }
+
+    return await withAsyncRetry(operation, { signal, timeout: 15000, retries: 2 })
   }, [])
 
-  const fetchUserProfile = useCallback(async (userId: string, existingSession?: Session | null) => {
-    try {
+  const fetchUserProfile = useCallback(async (userId: string, existingSession?: Session | null, signal?: AbortSignal): Promise<AsyncResult<UserProfile>> => {
+    const operation = async (abortSignal?: AbortSignal) => {
       let session = existingSession
       if (!session) {
         console.log('[Supabase] supabase.auth.getSession in fetchUserProfile');
+        if (abortSignal?.aborted) throw new Error('Operation aborted')
+        
         const { data: { session: newSession } } = await supabase.auth.getSession()
         session = newSession
       }
       
-      console.log('[Supabase] supabase.from(\'user_profiles\').select().eq(\'id\', userId) in fetchUserProfile');
+      if (abortSignal?.aborted) throw new Error('Operation aborted')
+      
+      console.log('[Supabase] Fetching user profile');
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -153,37 +217,28 @@ export default function SignUpJuneClient() {
       
       if (error) {
         if (error.code === 'PGRST116') {
-          await createUserProfile(userId)
-          return
+          // Profile doesn't exist, create it
+          const createResult = await createUserProfile(userId, abortSignal)
+          if (!createResult.success || !createResult.data) {
+            throw new Error(createResult.error || 'Failed to create user profile')
+          }
+          return createResult.data
         }
-        
-        setLoading(false)
-        return
+        throw new Error(`Profile fetch failed: ${error.message}`)
       }
 
-      setProfile(data)
-      setLoading(false)
-      
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
-      if (errorMessage.includes('aborted') || errorMessage.includes('timeout') || errorMessage.includes('network')) {
-        try {
-          await createUserProfile(userId)
-        } catch {
-          setLoading(false)
-        }
-      } else {
-        setLoading(false)
-      }
+      return data
     }
+
+    return await withAsyncRetry(operation, { signal, timeout: 15000, retries: 2 })
   }, [createUserProfile])
 
   useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    
     const getSessionAndProfile = async () => {
-      const timeoutId = setTimeout(() => {
-        setLoading(false)
-      }, 10000)
+      if (!mountedRef.current) return
       
       try {
         // First check for any hash parameters (implicit flow)
@@ -193,67 +248,119 @@ export default function SignUpJuneClient() {
           await new Promise(resolve => setTimeout(resolve, 1000))
         }
         
+        if (controller.signal.aborted) return
+        
         console.log('[Supabase] supabase.auth.getSession in useEffect/getSessionAndProfile');
         const { data: { session } } = await supabase.auth.getSession()
         console.log('Initial session check:', !!session)
         
+        if (controller.signal.aborted) return
+        
         if (session) {
-          try {
-            console.log('[Supabase] supabase.auth.getUser in useEffect/getSessionAndProfile (session check)');
-            await supabase.auth.getUser()
-          } catch {
-            // Handle auth test error silently
+          if (mountedRef.current) {
+            setUser(session.user)
+          }
+          
+          const profileResult = await fetchUserProfile(session.user.id, session, controller.signal)
+          
+          if (mountedRef.current) {
+            if (profileResult.success && profileResult.data) {
+              setProfile(profileResult.data)
+            } else {
+              console.error('Failed to fetch profile:', profileResult.error)
+              // Handle specific errors
+              if (profileResult.error?.includes('sign in again')) {
+                console.log('[Supabase] Signing out due to corrupted session');
+                await supabase.auth.signOut()
+                setUser(null)
+                setProfile(null)
+              }
+            }
+            setLoading(false)
+          }
+        } else {
+          if (mountedRef.current) {
+            setUser(null)
+            setProfile(null)
+            setLoading(false)
           }
         }
-      } catch {
-        setLoading(false)
-      } finally {
-        clearTimeout(timeoutId)
+      } catch (error: unknown) {
+        if (!controller.signal.aborted && mountedRef.current) {
+          console.error('Critical error in getSessionAndProfile:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          
+          if (errorMessage.includes('JWT') || errorMessage.includes('user not found')) {
+            console.log('[Supabase] Signing out due to JWT/user error');
+            try {
+              await supabase.auth.signOut()
+            } catch {
+              // Ignore sign out errors
+            }
+            setUser(null)
+            setProfile(null)
+          }
+          setLoading(false)
+        }
       }
     }
 
     getSessionAndProfile()
 
-    console.log('[Supabase] supabase.auth.onAuthStateChange listener setup');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change event:', event, 'Session exists:', !!session);
-        setUser(session?.user ?? null)
+        if (!mountedRef.current || controller.signal.aborted) return
         
-        const timeoutId = setTimeout(() => {
-          setLoading(false)
-        }, 8000)
+        console.log('Auth state change:', event)
         
         try {
           if (session?.user) {
-            await fetchUserProfile(session.user.id, session)
+            setUser(session.user)
             
-            // Clear URL hash after successful authentication (implicit flow)
-            if (typeof window !== 'undefined' && window.location.hash && event === 'SIGNED_IN') {
-              window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
+            const profileResult = await fetchUserProfile(session.user.id, session, controller.signal)
+            
+            if (mountedRef.current && !controller.signal.aborted) {
+              if (profileResult.success && profileResult.data) {
+                setProfile(profileResult.data)
+              } else {
+                console.error('Failed to fetch profile on auth change:', profileResult.error)
+                setProfile(null)
+              }
             }
           } else {
+            if (mountedRef.current) {
+              setUser(null)
+              setProfile(null)
+            }
+          }
+        } catch (error) {
+          if (mountedRef.current && !controller.signal.aborted) {
+            console.error('Error in auth state change:', error)
+            setUser(null)
             setProfile(null)
+          }
+        } finally {
+          if (mountedRef.current && !controller.signal.aborted) {
             setLoading(false)
           }
-        } catch {
-          setLoading(false)
-        } finally {
-          clearTimeout(timeoutId)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      controller.abort('Component unmounting')
+      subscription.unsubscribe()
+    }
   }, [fetchUserProfile])
 
-  const signInWithGoogle = async () => {
-    if (!mounted) {
-      return
+  const signInWithGoogle = async (): Promise<AsyncResult<void>> => {
+    if (!mounted || !mountedRef.current) {
+      return { data: null, error: 'Component not mounted', success: false }
     }
     
-    setLoading(true)
-    try {
+    const operation = async () => {
+      setLoading(true)
+      
       const currentOrigin = window.location.origin
       const hostname = window.location.hostname
       
@@ -262,12 +369,11 @@ export default function SignUpJuneClient() {
         baseUrl = currentOrigin
       } else if (hostname.includes('vercel.app')) {
         baseUrl = currentOrigin // For Vercel preview and production
-      } else if (hostname === 'mvrk.haus') { // Added specific domain
+      } else if (hostname === 'mvrk.haus') {
         baseUrl = 'https://www.mvrk.haus' 
-      } else if (hostname === 'www.mvrk.haus') { // Added www specific domain
+      } else if (hostname === 'www.mvrk.haus') {
         baseUrl = currentOrigin
       } else {
-        // Fallback for other environments, might need adjustment
         baseUrl = currentOrigin
       }
       
@@ -286,80 +392,66 @@ export default function SignUpJuneClient() {
       })
 
       if (error) {
-        console.error('Google Sign-In Error:', error)
-        setUrlError(`Google Sign-In Failed: ${error.message}`)
+        throw new Error(`Google Sign-In Failed: ${error.message}`)
+      }
+      
+      return undefined
+    }
+
+    const result = await withAsyncRetry(operation, { timeout: 30000, retries: 1 })
+    
+    if (mountedRef.current) {
+      if (!result.success) {
+        setUrlError(result.error || 'Google Sign-In failed')
         setLoading(false)
       }
-    } catch (error: unknown) {
-      console.error('Google Sign-In Exception:', error)
-      const message = error instanceof Error ? error.message : 'Unknown Google Sign-in exception'
-      setUrlError(`Google Sign-In Exception: ${message}`)
+    }
+    
+    return result
+  }
+
+  const signOut = async (): Promise<AsyncResult<void>> => {
+    const operation = async () => {
+      setLoading(true)
+      console.log('[Supabase] supabase.auth.signOut()')
+      
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        throw new Error(`Sign out failed: ${error.message}`)
+      }
+      
+      return undefined
+    }
+
+    const result = await withAsyncRetry(operation, { timeout: 10000, retries: 1 })
+    
+    if (mountedRef.current) {
+      if (result.success) {
+        setUser(null)
+        setProfile(null)
+        setPasscode(new Array(8).fill(''))
+      }
       setLoading(false)
     }
+    
+    return result
   }
 
-  const signOut = async () => {
-    setLoading(true)
-    console.log('[Supabase] supabase.auth.signOut()');
-    await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    setPasscode(new Array(8).fill(''))
-    setLoading(false)
-  }
-
-  const handlePasscodeChange = (index: number, value: string) => {
-    if (value && !/^\d$/.test(value)) return
-    
-    const newPasscode = [...passcode]
-    newPasscode[index] = value
-    setPasscode(newPasscode)
-    
-    if (mounted && value && index < 7) {
-      const nextInput = document.getElementById(`passcode-${index + 1}`)
-      nextInput?.focus()
-    }
-  }
-
-  const handlePasscodeKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (mounted && e.key === 'Backspace' && !passcode[index] && index > 0) {
-      const prevInput = document.getElementById(`passcode-${index - 1}`)
-      prevInput?.focus()
-    }
-  }
-
-  const handlePasscodePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 8)
-    const newPasscode = new Array(8).fill('')
-    
-    for (let i = 0; i < pastedData.length; i++) {
-      newPasscode[i] = pastedData[i]
-    }
-    
-    setPasscode(newPasscode)
-    
-    if (mounted) {
-      const nextEmptyIndex = pastedData.length < 8 ? pastedData.length : 7
-      const nextInput = document.getElementById(`passcode-${nextEmptyIndex}`)
-      nextInput?.focus()
-    }
-  }
-
-  const submitPasscode = async () => {
+  const submitPasscode = async (): Promise<AsyncResult<void>> => {
     if (!user) {
-      alert('User not found. Please sign in.')
-      return
+      return { data: null, error: 'User not found. Please sign in.', success: false }
     }
     
     const fullPasscode = passcode.join('')
     if (fullPasscode.length !== 8) {
-      alert('Please enter all 8 digits')
-      return
+      return { data: null, error: 'Please enter all 8 digits', success: false }
     }
     
-    setPasscodeLoading(true)
-    try {
+    const operation = async (signal?: AbortSignal) => {
+      setPasscodeLoading(true)
+      
+      if (signal?.aborted) throw new Error('Operation cancelled')
+      
       console.log('Verifying passcode:', fullPasscode, 'for user:', user.email);
       const { data: juneOtpEntry, error: otpError } = await supabase
         .from('june-otp')
@@ -367,39 +459,36 @@ export default function SignUpJuneClient() {
         .eq('passcode', fullPasscode)
         .single()
       
+      if (signal?.aborted) throw new Error('Operation cancelled')
+      
       if (otpError || !juneOtpEntry) {
-        alert('Invalid passcode. Please check and try again.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('Invalid passcode. Please check and try again.')
       }
 
+      // Check if passcode is already registered
       if (juneOtpEntry.is_register && juneOtpEntry.registered_user_id) {
-        console.log('[Supabase] supabase.auth.admin.getUserById(' + juneOtpEntry.registered_user_id + ') in submitPasscode');
+        if (signal?.aborted) throw new Error('Operation cancelled')
+        
+        console.log('[Supabase] Checking existing registered user');
         const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.getUserById(juneOtpEntry.registered_user_id)
         
         if (!authCheckError && existingAuthUser.user) {
           if (juneOtpEntry.registered_user_id !== user!.id) {
-            alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
-            setPasscodeLoading(false)
-            return
+            throw new Error('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
           }
-          alert('이 인증번호는 이미 사용되었습니다.')
-          setPasscodeLoading(false)
-          return
+          throw new Error('이 인증번호는 이미 사용되었습니다.')
         }
       } else if (juneOtpEntry.is_register && !juneOtpEntry.registered_user_id) {
-        alert('이 인증번호는 이미 사용되었습니다. 다른 인증번호를 사용하거나 문의해주세요.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('이 인증번호는 이미 사용되었습니다. 다른 인증번호를 사용하거나 문의해주세요.')
       }
 
       if (juneOtpEntry.registered_user_id && juneOtpEntry.registered_user_id !== user!.id) {
-        alert('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('이 인증번호는 다른 계정에서 이미 사용중입니다. 문의해주세요.')
       }
 
-      console.log('[Supabase] supabase.from(\'user_profiles\').select(\'role, "june-ot-legalName"\').eq(\'id\', user!.id) in submitPasscode');
+      if (signal?.aborted) throw new Error('Operation cancelled')
+
+      console.log('[Supabase] Checking existing profile');
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('user_profiles')
         .select('role, "june-ot-legalName"')
@@ -407,16 +496,14 @@ export default function SignUpJuneClient() {
         .single()
 
       if (profileCheckError) {
-        alert('Error checking profile. Please try again.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('Error checking profile. Please try again.')
       }
 
       if (existingProfile.role === 'general_member' && existingProfile['june-ot-legalName']) {
-        alert('이 계정은 이미 다른 인증번호로 등록되어 있습니다.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('이 계정은 이미 다른 인증번호로 등록되어 있습니다.')
       }
+
+      if (signal?.aborted) throw new Error('Operation cancelled')
 
       // Update user_profiles table
       console.log('Updating user profile role based on passcode for user ID:', user.id);
@@ -440,10 +527,10 @@ export default function SignUpJuneClient() {
         .eq('id', user!.id)
 
       if (profileError) {
-        alert('Error updating profile. Please try again.')
-        setPasscodeLoading(false)
-        return
+        throw new Error('Error updating profile. Please try again.')
       }
+
+      if (signal?.aborted) throw new Error('Operation cancelled')
 
       // Mark passcode as used in june-otp table
       console.log('Marking passcode as registered in june-otp for passcode:', fullPasscode);
@@ -453,22 +540,87 @@ export default function SignUpJuneClient() {
         .eq('passcode', fullPasscode)
 
       if (updateOtpError) {
-        alert('Profile updated successfully, but there was an issue updating the passcode status. Please contact support if you encounter any issues.')
+        console.warn('OTP update error:', updateOtpError)
+        // Don't throw here as the main operation succeeded
       }
 
-      await fetchUserProfile(user!.id)
-      setPasscode(new Array(8).fill(''))
-      alert('Passcode verified successfully! Welcome to MVRK HAUS!')
+      if (signal?.aborted) throw new Error('Operation cancelled')
+
+      // Refresh user profile
+      const profileResult = await fetchUserProfile(user!.id, null, signal)
+      if (profileResult.success && profileResult.data && mountedRef.current) {
+        setProfile(profileResult.data)
+      }
       
-    } catch {
-      alert('Error verifying passcode. Please try again.')
-    } finally {
+      return undefined
+    }
+
+    const result = await withAsyncRetry(operation, { timeout: 30000, retries: 2 })
+    
+    if (mountedRef.current) {
+      if (result.success) {
+        setPasscode(new Array(8).fill(''))
+        // Show success message
+        setTimeout(() => {
+          if (mountedRef.current) {
+            alert('Passcode verified successfully! Welcome to MVRK HAUS!')
+          }
+        }, 100)
+      } else {
+        alert(result.error || 'Error verifying passcode. Please try again.')
+      }
       setPasscodeLoading(false)
+    }
+    
+    return result
+  }
+
+  const handlePasscodeChange = (index: number, value: string) => {
+    if (value && !/^\d$/.test(value)) return
+    
+    const newPasscode = [...passcode]
+    newPasscode[index] = value
+    setPasscode(newPasscode)
+    
+    if (mountedRef.current && value && index < 7) {
+      const nextInput = document.getElementById(`passcode-${index + 1}`)
+      nextInput?.focus()
+    }
+  }
+
+  const handlePasscodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (mountedRef.current && e.key === 'Backspace' && !passcode[index] && index > 0) {
+      const prevInput = document.getElementById(`passcode-${index - 1}`)
+      prevInput?.focus()
+    }
+  }
+
+  const handlePasscodePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 8)
+    const newPasscode = new Array(8).fill('')
+    
+    for (let i = 0; i < pastedData.length; i++) {
+      newPasscode[i] = pastedData[i]
+    }
+    
+    setPasscode(newPasscode)
+    
+    if (mountedRef.current) {
+      const nextEmptyIndex = pastedData.length < 8 ? pastedData.length : 7
+      const nextInput = document.getElementById(`passcode-${nextEmptyIndex}`)
+      nextInput?.focus()
     }
   }
 
   useEffect(() => {
     setMounted(true)
+    return () => {
+      mountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort('Component cleanup')
+      }
+    }
   }, [])
 
   if (loading) {
